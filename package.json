@@ -1,0 +1,23 @@
+{
+  "name": "@hmilne/tinystate",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "preact": "^10.26.9"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.0",
+    "@biomejs/biome": "^2.1.4",
+    "@preact/preset-vite": "^2.10.2",
+    "@types/babel__core": "^7",
+    "@yarnpkg/sdks": "^3.2.2",
+    "typescript": "~5.9.2",
+    "vite": "^7.0.4"
+  }
+}
