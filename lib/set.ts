@@ -54,6 +54,9 @@ export function set<K extends string>(): SetSchema<K> {
       }
       return new ReadonlySetImpl(set);
     },
+    computeDefault() {
+      return SET_EMPTY;
+    },
     change(entry, value) {
       for (const [key, member] of entry.members()) {
         if (!value.has(key)) {

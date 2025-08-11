@@ -18,6 +18,9 @@ export function scalar<T>(
       }
       return value;
     },
+    computeDefault() {
+      return defaultValue;
+    },
     change(entry, value) {
       if (compare(value, entry.get())) {
         return VALUE_KEEP;

@@ -1,5 +1,5 @@
 import type { Kind, Schema, ValueOf } from "./common";
-import { createRoot, KIND_WIDENING, VALUE_KEEP } from "./common";
+import { KIND_WIDENING, VALUE_KEEP } from "./common";
 import { type Scalar, scalar } from "./scalar";
 
 type ArrayValue<T extends Schema> = readonly ValueOf<T>[];
@@ -39,6 +39,9 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
         value[i] = entry.$(i).get();
       }
       return value;
+    },
+    computeDefault() {
+      return ARRAY_EMPTY;
     },
     change(entry, value): typeof VALUE_KEEP {
       entry.$("length").set(value.length);
@@ -80,6 +83,7 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
 /* v8 ignore if -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
+  const { createRoot } = await import("./");
   test("set/get round-trip", () => {
     const entry = createRoot(array(scalar(666)), () => 0);
     expect(entry.$("length").get()).toBe(0);

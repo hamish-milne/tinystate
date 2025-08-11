@@ -1,12 +1,7 @@
-export type AnyMembers = Record<string | number | symbol, Schema | undefined>;
+export type AnyMembers = Record<string | number | symbol, Schema>;
 export type AnyMutations = Record<string, (...args: any[]) => void>;
 
-export type EntryOf<T extends Schema | undefined> = T extends Schema<
-  infer A,
-  infer B,
-  infer C,
-  infer D
->
+export type EntryOf<T extends Schema> = T extends Schema<infer A, infer B, infer C, infer D>
   ? Entry<A, B, C, D>
   : never;
 
@@ -69,6 +64,7 @@ export interface Schema<
     entry: Entry<T, TParent, TMembers, TMutations>,
     value: T | typeof VALUE_UNSET,
   ): T | typeof VALUE_KEEP;
+  computeDefault(): T;
   change(entry: Entry<T, TParent, TMembers, TMutations>, value: T): T | typeof VALUE_KEEP;
   getMember<K extends keyof TMembers>(key: K): TMembers[K];
   getMember(key: keyof TMembers): TMembers[keyof TMembers];
@@ -113,6 +109,7 @@ export interface Entry<
   get mutations(): TMutations;
   get parent(): Entry<TParent> | undefined;
   get kind(): Kind;
+  get default(): T;
 }
 
 class EntryImpl<
@@ -131,6 +128,7 @@ class EntryImpl<
   private _manager: Manager;
   private _mutations: TMutations | undefined;
   private _isComputing: boolean = false;
+  private _default: T | typeof VALUE_UNSET = VALUE_UNSET;
 
   constructor(schema: Schema<T, TParent, TMembers, TMutations>, parent: EntryImpl | Manager) {
     this._schema = schema;
@@ -145,6 +143,16 @@ class EntryImpl<
 
   get parent() {
     return this._parent;
+  }
+
+  get default(): T {
+    if (this._schema === ENTRY_DESTROYED) {
+      throw new DestroyedError();
+    }
+    if (this._default === VALUE_UNSET) {
+      this._default = this._schema.computeDefault();
+    }
+    return this._default;
   }
 
   get(): T {

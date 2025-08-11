@@ -15,14 +15,23 @@ export type ObjectSchema<TMembers extends AnyMembers> = Schema<
 export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSchema<TMembers> {
   return {
     compute(entry) {
-      const value: Partial<ObjectValue<TMembers>> = {};
+      const value = { ...entry.default };
       for (const [key, member] of entry.members()) {
         if (member.kind === KIND_NARROWING) {
           continue; // Skip computed members
         }
         value[key] = member.get();
       }
-      return value as ObjectValue<TMembers>;
+      return value;
+    },
+    computeDefault() {
+      return Object.freeze(
+        Object.fromEntries(
+          Object.entries(members)
+            .filter(([_key, member]) => member.kind !== KIND_NARROWING)
+            .map(([key, member]) => [key, member.computeDefault()]),
+        ),
+      ) as ObjectValue<TMembers>;
     },
     change(entry, value): typeof VALUE_KEEP {
       for (const [key, member] of entry.members()) {

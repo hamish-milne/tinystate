@@ -11,6 +11,9 @@ export function sync<T>(
     compute(_entry) {
       return getter();
     },
+    computeDefault() {
+      throw new NotImplementedError();
+    },
     change(_entry, value) {
       if (compare(value, value)) {
         return VALUE_KEEP;

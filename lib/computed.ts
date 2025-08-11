@@ -1,5 +1,5 @@
 import type { AnyMembers, Empty, Kind, Schema } from "./common";
-import { KIND_NARROWING, VALUE_KEEP, VALUE_UNSET } from "./common";
+import { KIND_NARROWING, NotImplementedError, VALUE_KEEP, VALUE_UNSET } from "./common";
 
 export type Computed<T, TParent, TMembers extends AnyMembers> = Schema<T, TParent, TMembers, Empty>;
 
@@ -20,6 +20,9 @@ export function computed<T, TParent, TMembers extends AnyMembers>(
       }
       return newValue;
     },
+    computeDefault() {
+      throw new NotImplementedError();
+    },
     change(_entry, _value) {
       return VALUE_KEEP; // Computed values are not directly changeable
     },
@@ -39,4 +42,29 @@ export function computed<T, TParent, TMembers extends AnyMembers>(
       // Computed values do not support unset, as they are derived from their parent
     },
   };
+}
+
+/* v8 ignore if -- @preserve */
+if (import.meta.vitest) {
+  const { test, expect, vi } = import.meta.vitest;
+  const { createRoot, object, scalar } = await import("./");
+  test("get value", async () => {
+    vi.useFakeTimers();
+    const schema = object({
+      a: scalar(3),
+      b: scalar(4),
+      sum: computed((parent) => parent.a + parent.b),
+    });
+    const entry = createRoot(schema);
+    expect(entry.$("sum").get()).toBe(7);
+    entry.$("a").set(5);
+    vi.runAllTimers();
+    expect(entry.$("sum").get()).toBe(9);
+    entry.$("b").set(2);
+    vi.runAllTimers();
+    expect(entry.$("sum").get()).toBe(7);
+    entry.$("sum").set(10); // Should not change anything, as computed
+    vi.runAllTimers();
+    expect(entry.$("sum").get()).toBe(7);
+  });
 }

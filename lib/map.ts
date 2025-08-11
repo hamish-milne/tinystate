@@ -46,6 +46,9 @@ export function map<K extends string, V extends Schema>(valueSchema: V): MapSche
       }
       return new ReadonlyMapImpl(map);
     },
+    computeDefault() {
+      return MAP_EMPTY;
+    },
     change(entry, value) {
       for (const [key, member] of entry.members()) {
         const newValue = value.get(key);
