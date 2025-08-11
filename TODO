@@ -1,0 +1,38 @@
+Core features:
+  Schema:
+    ✔ Interface @done(25-08-11 12:24)
+  Entry:
+    ✔ Basic implementation @done(25-08-11 12:24)
+    ☐ Unit tests
+    ☐ Proxy for members/mutations
+  Manager:
+    ✔ Basic implementation @done(25-08-11 12:24)
+    ☐ Unit tests
+    ☐ 'step' counter
+Schema types:
+  Scalar:
+    ✔ Basic implementation @done(25-08-11 12:24)
+    ☐ Unit tests
+  Map:
+    ✔ Basic implementation @done(25-08-11 12:24)
+    ☐ Unit tests
+  Set:
+    ✔ Basic implementation @done(25-08-11 12:24)
+    ☐ Unit tests
+  Array:
+    ✔ Basic implementation @done(25-08-11 12:24)
+    ☐ Unit tests
+  Object:
+    ✔ Basic implementation @done(25-08-11 12:24)
+    ☐ Unit tests
+  Computed:
+    ✔ Basic implementation @done(25-08-11 12:24)
+    ☐ Unit tests
+  Sync:
+    ✔ Basic implementation @done(25-08-11 12:24)
+    ☐ Unit tests
+Helpers:
+  ✔ Create schema from default values @done(25-08-11 12:57)
+  ✔ Form text field @done(25-08-11 12:57)
+  ✔ Form checkbox @done(25-08-11 12:57)
+  ✔ Form radio button @done(25-08-11 12:57)

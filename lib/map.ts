@@ -63,8 +63,8 @@ export function map<K extends string, V extends Schema>(valueSchema: V): MapSche
     },
     mutations(entry) {
       return {
-        set: (key: K, value: V) => entry.getMember(key).set(value),
-        delete: (key: K) => entry.getMember(key).unset(),
+        set: (key: K, value: V) => entry.$(key).set(value),
+        delete: (key: K) => entry.$(key).unset(),
         clear: () => {
           for (const [_, member] of entry.members()) {
             member.unset(); // Clear all members

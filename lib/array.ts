@@ -1,100 +1,123 @@
-import type { Entry, Kind, Schema } from "./common";
-import { KIND_WIDENING, VALUE_KEEP, type VALUE_UNSET } from "./common";
+import type { Kind, Schema, ValueOf } from "./common";
+import { createRoot, KIND_WIDENING, VALUE_KEEP } from "./common";
 import { type Scalar, scalar } from "./scalar";
 
-type ArrayValue<T extends Schema> = readonly (T extends Schema<infer V>
-  ? V
-  : never)[];
+type ArrayValue<T extends Schema> = readonly ValueOf<T>[];
 
 type ArrayMembers<T extends Schema> = {
-  [idx: number]: T | undefined;
+  [idx: number]: T;
 } & { length: Scalar<number> };
 
 type ArrayMutations<T extends Schema> = {
-  push(value: T): void;
+  push(value: ValueOf<T>): void;
   pop(): void;
   clear(): void;
 };
 
-type ArrayEntry<T extends Schema> = Entry<
+const ArrayLength = scalar(0);
+const ARRAY_EMPTY = Object.freeze([]);
+
+export type ArraySchema<T extends Schema> = Schema<
   ArrayValue<T>,
   unknown,
   ArrayMembers<T>,
   ArrayMutations<T>
 >;
 
-const ArrayLength = scalar(0);
-const ARRAY_EMPTY = Object.freeze([]);
-
-export type { ArraySchema };
-class ArraySchema<T extends Schema>
-  implements Schema<ArrayValue<T>, unknown, ArrayMembers<T>, ArrayMutations<T>>
-{
-  private readonly _itemSchema: T;
-
-  constructor(itemSchema: T) {
-    this._itemSchema = itemSchema;
-  }
-
-  get kind(): Kind {
-    return KIND_WIDENING;
-  }
-
-  compute(entry: ArrayEntry<T>): ArrayValue<T> {
-    const length = entry.getMember("length").get();
-    if (length === 0) {
-      return ARRAY_EMPTY;
-    }
-    const value = new Array(length) as ArrayValue<T>[number][];
-    for (let i = 0; i < length; i++) {
-      value[i] = entry.getMember(i).get();
-    }
-    return value;
-  }
-
-  change(entry: ArrayEntry<T>, value: ArrayValue<T>): typeof VALUE_KEEP {
-    entry.getMember("length").set(value.length);
-    for (let i = 0, l = value.length; i < l; i++) {
-      entry.getMember(i).set(value[i]);
-    }
-    // We allow the members to call invalidate themselves, so we don't need to do anything here
-    return VALUE_KEEP;
-  }
-
-  getMember<K extends number | "length">(key: K): ArrayMembers<T>[K] {
-    if (key === "length") {
-      return ArrayLength as ArrayMembers<T>[K];
-    }
-    if (typeof key === "number" && key >= 0) {
-      return this._itemSchema as ArrayMembers<T>[K];
-    }
-    throw new Error(`Invalid key for ArraySchema: ${key}`);
-  }
-
-  mutations(entry: ArrayEntry<T>): ArrayMutations<T> {
-    return {
-      push: (value: T) => {
-        const currentLength = entry.getMember("length").get();
-        entry.getMember(currentLength).set(value);
-        entry.getMember("length").set(currentLength + 1);
-      },
-      pop: () =>
-        entry
-          .getMember("length")
-          .set(Math.max(0, entry.getMember("length").get() - 1)),
-      clear: () => entry.getMember("length").set(0),
-    };
-  }
-
-  hasValue(entry: ArrayEntry<T>, _value: ArrayValue<T> | typeof VALUE_UNSET) {
-    return entry.getMember("length").get() > 0;
-  }
-
-  unset(entry: ArrayEntry<T>) {
-    entry.getMember("length").set(0);
-  }
+export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
+  return {
+    get kind(): Kind {
+      return KIND_WIDENING;
+    },
+    compute(entry) {
+      const length = entry.$("length").get();
+      if (length === 0) {
+        return ARRAY_EMPTY;
+      }
+      const value: ArrayValue<T>[number][] = new Array(length);
+      for (let i = 0; i < length; i++) {
+        value[i] = entry.$(i).get();
+      }
+      return value;
+    },
+    change(entry, value): typeof VALUE_KEEP {
+      entry.$("length").set(value.length);
+      for (let i = 0, l = value.length; i < l; i++) {
+        entry.$(i).set(value[i]);
+      }
+      // We allow the members to call invalidate themselves, so we don't need to do anything here
+      return VALUE_KEEP;
+    },
+    getMember<K extends number | "length">(key: K) {
+      if (key === "length") {
+        return ArrayLength as ArrayMembers<T>[K];
+      }
+      if (typeof key === "number" && key >= 0) {
+        return itemSchema as ArrayMembers<T>[K];
+      }
+      throw new Error(`Invalid key for ArraySchema: ${key}`);
+    },
+    mutations(entry) {
+      return {
+        push: (value: ValueOf<T>) => {
+          const currentLength = entry.$("length").get();
+          entry.$(currentLength).set(value);
+          entry.$("length").set(currentLength + 1);
+        },
+        pop: () => entry.$("length").set(Math.max(0, entry.$("length").get() - 1)),
+        clear: () => entry.$("length").set(0),
+      };
+    },
+    hasValue(entry, _value) {
+      return entry.$("length").get() > 0;
+    },
+    unset(entry) {
+      entry.$("length").set(0);
+    },
+  };
 }
 
-export function array<T extends Schema>(itemSchema: T) {
-  return new ArraySchema<T>(itemSchema);
+/* v8 ignore if -- @preserve */
+if (import.meta.vitest) {
+  const { test, expect } = import.meta.vitest;
+  test("set/get round-trip", () => {
+    const entry = createRoot(array(scalar(666)), () => 0);
+    expect(entry.$("length").get()).toBe(0);
+    entry.set([1, 2, 3]);
+    expect(entry.$("length").get()).toBe(3);
+    expect(entry.$(0).get()).toBe(1);
+    expect(entry.$(1).get()).toBe(2);
+    expect(entry.$(2).get()).toBe(3);
+    expect(entry.get()).toEqual([1, 2, 3]);
+  });
+
+  test("length change", () => {
+    const entry = createRoot(array(scalar(666)), () => 0);
+    entry.$("length").set(3);
+    expect(entry.get()).toEqual([666, 666, 666]);
+    entry.$(4).set(1);
+    expect(entry.get()).toEqual([666, 666, 666]);
+  });
+
+  test("hasValue/unset", () => {
+    const entry = createRoot(array(scalar(666)), () => 0);
+    expect(entry.hasValue()).toBe(false);
+    entry.set([1, 2, 3]);
+    expect(entry.hasValue()).toBe(true);
+    entry.unset();
+    expect(entry.hasValue()).toBe(false);
+  });
+
+  test("mutations", () => {
+    const entry = createRoot(array(scalar(666)), () => 0);
+    expect(entry.get()).toEqual([]);
+    entry.mutations.push(1);
+    expect(entry.get()).toEqual([1]);
+    entry.mutations.push(2);
+    expect(entry.get()).toEqual([1, 2]);
+    entry.mutations.pop();
+    expect(entry.get()).toEqual([1]);
+    entry.mutations.clear();
+    expect(entry.get()).toEqual([]);
+  });
 }

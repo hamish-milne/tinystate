@@ -61,7 +61,7 @@ export function set<K extends string>(): SetSchema<K> {
         }
       }
       for (const key of value) {
-        entry.getMember(key).set(true); // Set the member to true if it exists in the new set
+        entry.$(key).set(true); // Set the member to true if it exists in the new set
       }
       // We allow the members to call invalidate themselves, so we don't need to do anything here
       return VALUE_KEEP;
@@ -71,8 +71,8 @@ export function set<K extends string>(): SetSchema<K> {
     },
     mutations(entry) {
       return {
-        add: (key: K) => entry.getMember(key).set(true),
-        delete: (key: K) => entry.getMember(key).set(false),
+        add: (key: K) => entry.$(key).set(true),
+        delete: (key: K) => entry.$(key).set(false),
         clear: () => {
           for (const [_, member] of entry.members()) {
             member.set(false); // Clear all members

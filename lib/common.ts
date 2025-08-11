@@ -10,6 +10,8 @@ export type EntryOf<T extends Schema | undefined> = T extends Schema<
   ? Entry<A, B, C, D>
   : never;
 
+export type ValueOf<T extends Schema> = T extends Schema<infer V> ? V : never;
+
 type MemberPairs<T extends AnyMembers> = {
   [K in keyof T]: [K, EntryOf<T[K]>];
 }[keyof T];
@@ -107,7 +109,7 @@ export interface Entry<
   isDestroyed(): boolean;
   hasValue(): boolean;
   members(): IteratorObject<MemberPairs<TMembers>>;
-  getMember<K extends keyof TMembers>(key: K): MemberEntries<TMembers>[K];
+  $<K extends keyof TMembers>(key: K): MemberEntries<TMembers>[K];
   get mutations(): TMutations;
   get parent(): Entry<TParent> | undefined;
   get kind(): Kind;
@@ -227,8 +229,8 @@ class EntryImpl<
       if (kind === KIND_WIDENING) {
         this._value = VALUE_UNSET;
       }
+      this._parent?.invalidate();
       if (this._manager.scheduleNotify(this)) {
-        this._parent?.invalidate();
         for (const [_, member] of this.members()) {
           if (member.kind === KIND_NARROWING) {
             member.invalidate();
@@ -304,7 +306,7 @@ class EntryImpl<
     return (this._members ?? MAP_EMPTY).entries() as IteratorObject<MemberPairs<TMembers>>;
   }
 
-  getMember<K extends keyof TMembers>(key: K): MemberEntries<TMembers>[K] {
+  $<K extends keyof TMembers>(key: K): MemberEntries<TMembers>[K] {
     if (this._schema === ENTRY_DESTROYED) {
       throw new DestroyedError();
     }
@@ -324,22 +326,26 @@ class EntryImpl<
     if (this._schema === ENTRY_DESTROYED) {
       throw new DestroyedError();
     }
-    this._mutations ??= this._schema.mutations(this);
+    this._mutations ??= Object.freeze(this._schema.mutations(this));
     return this._mutations;
   }
 }
+
+type Scheduler = (callback: () => void) => number | undefined;
 
 class Manager {
   private _timeoutId: number | undefined;
   private _updateIteration: number = 0;
   private readonly _updateIterationMax: number = 3; // Maximum iterations to prevent infinite loops
   private readonly _update: () => void;
+  private readonly _scheduler: Scheduler;
   private readonly _toNotify = new Set<EntryImpl>();
   private readonly _toRecompute = new Set<EntryImpl>();
   private readonly _toDestroy = new Set<EntryImpl>();
 
-  constructor() {
+  constructor(scheduler: Scheduler) {
     this._update = this.update.bind(this);
+    this._scheduler = scheduler;
   }
 
   private scheduleUpdate() {
@@ -348,7 +354,7 @@ class Manager {
       if (this._updateIteration > this._updateIterationMax) {
         throw new Error("Too many iterations in state manager timeout, possible infinite loop");
       }
-      this._timeoutId = window.setTimeout(this._update, 0);
+      this._timeoutId = this._scheduler(this._update);
     }
   }
 
@@ -402,6 +408,9 @@ export function createRoot<
   TParent,
   TMembers extends AnyMembers,
   TMutations extends AnyMutations,
->(schema: Schema<T, TParent, TMembers, TMutations>): Entry<T, TParent, TMembers, TMutations> {
-  return new EntryImpl(schema, new Manager());
+>(
+  schema: Schema<T, TParent, TMembers, TMutations>,
+  scheduler: Scheduler = setTimeout,
+): Entry<T, TParent, TMembers, TMutations> {
+  return new EntryImpl(schema, new Manager(scheduler));
 }

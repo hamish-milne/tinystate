@@ -38,35 +38,35 @@ export function App() {
       <form style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         <label>
           Name:
-          <input type="text" {...useFormField(state.getMember("name"))} />
+          <input type="text" {...useFormField(state.$("name"))} />
         </label>
         <label>
           Age:
-          <input type="number" {...useFormField(state.getMember("age"))} />
+          <input type="number" {...useFormField(state.$("age"))} />
         </label>
         <label>
           Active:
-          <input {...useFormCheckbox(state.getMember("isActive"))} />
+          <input {...useFormCheckbox(state.$("isActive"))} />
         </label>
         <label>
           Full Name:
-          <input type="text" {...useFormField(state.getMember("fullName"))} readOnly />
+          <input type="text" {...useFormField(state.$("fullName"))} readOnly />
         </label>
         <label>
           Tag 1:
-          <input {...useFormCheckbox(state.getMember("tags").getMember("tag1"))} />
+          <input {...useFormCheckbox(state.$("tags").$("tag1"))} />
         </label>
         <label>
           Tag 2:
-          <input {...useFormCheckbox(state.getMember("tags").getMember("tag2"))} />
+          <input {...useFormCheckbox(state.$("tags").$("tag2"))} />
         </label>
         <label>
           Tag 3:
-          <input {...useFormCheckbox(state.getMember("tags").getMember("tag1"))} />
+          <input {...useFormCheckbox(state.$("tags").$("tag1"))} />
         </label>
       </form>
       <h3>
-        <FullNameComponent entry={state.getMember("fullName")} />
+        <FullNameComponent entry={state.$("fullName")} />
       </h3>
       <div>
         <JsonDisplay entry={state} />
