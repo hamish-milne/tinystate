@@ -44,12 +44,12 @@ export function computed<T, TParent, TMembers extends AnyMembers>(
   };
 }
 
-/* v8 ignore if -- @preserve */
+/* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot, object, scalar } = await import("./");
+  vi.useFakeTimers();
   test("get value", async () => {
-    vi.useFakeTimers();
     const schema = object({
       a: scalar(3),
       b: scalar(4),

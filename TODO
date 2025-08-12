@@ -5,29 +5,31 @@ Core features:
     ✔ Basic implementation @done(25-08-11 12:24)
     ☐ Unit tests
     ☐ Proxy for members/mutations
+    ☐ Combine VALUE_UNSET and VALUE_KEEP
   Manager:
     ✔ Basic implementation @done(25-08-11 12:24)
     ☐ Unit tests
-    ☐ 'step' counter
+    ☐ 'step' counter (allow scheduleDestroy while scheduleNotify is ongoing)
 Schema types:
   Scalar:
     ✔ Basic implementation @done(25-08-11 12:24)
-    ☐ Unit tests
+    ✔ Unit tests @done(25-08-11 22:11)
   Map:
     ✔ Basic implementation @done(25-08-11 12:24)
-    ☐ Unit tests
+    ✔ Unit tests @done(25-08-11 21:37)
   Set:
     ✔ Basic implementation @done(25-08-11 12:24)
-    ☐ Unit tests
+    ✔ Unit tests @done(25-08-12 01:06)
   Array:
     ✔ Basic implementation @done(25-08-11 12:24)
-    ☐ Unit tests
+    ✔ Unit tests @done(25-08-11 21:37)
   Object:
     ✔ Basic implementation @done(25-08-11 12:24)
-    ☐ Unit tests
+    ✔ Unit tests @done(25-08-12 01:05)
   Computed:
     ✔ Basic implementation @done(25-08-11 12:24)
-    ☐ Unit tests
+    ✔ Unit tests @done(25-08-11 21:38)
+    ☐ Always recompute synchronously
   Sync:
     ✔ Basic implementation @done(25-08-11 12:24)
     ☐ Unit tests

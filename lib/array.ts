@@ -80,12 +80,13 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
   };
 }
 
-/* v8 ignore if -- @preserve */
+/* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
-  const { test, expect } = import.meta.vitest;
+  const { test, expect, vi } = import.meta.vitest;
   const { createRoot } = await import("./");
+  vi.useFakeTimers();
   test("set/get round-trip", () => {
-    const entry = createRoot(array(scalar(666)), () => 0);
+    const entry = createRoot(array(scalar(666)));
     expect(entry.$("length").get()).toBe(0);
     entry.set([1, 2, 3]);
     expect(entry.$("length").get()).toBe(3);
@@ -96,7 +97,7 @@ if (import.meta.vitest) {
   });
 
   test("length change", () => {
-    const entry = createRoot(array(scalar(666)), () => 0);
+    const entry = createRoot(array(scalar(666)));
     entry.$("length").set(3);
     expect(entry.get()).toEqual([666, 666, 666]);
     entry.$(4).set(1);
@@ -104,7 +105,7 @@ if (import.meta.vitest) {
   });
 
   test("hasValue/unset", () => {
-    const entry = createRoot(array(scalar(666)), () => 0);
+    const entry = createRoot(array(scalar(666)));
     expect(entry.hasValue()).toBe(false);
     entry.set([1, 2, 3]);
     expect(entry.hasValue()).toBe(true);
@@ -113,7 +114,7 @@ if (import.meta.vitest) {
   });
 
   test("mutations", () => {
-    const entry = createRoot(array(scalar(666)), () => 0);
+    const entry = createRoot(array(scalar(666)));
     expect(entry.get()).toEqual([]);
     entry.mutations.push(1);
     expect(entry.get()).toEqual([1]);

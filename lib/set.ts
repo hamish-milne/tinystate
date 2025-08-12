@@ -101,3 +101,45 @@ export function set<K extends string>(): SetSchema<K> {
     },
   };
 }
+
+/* v8 ignore start -- @preserve */
+if (import.meta.vitest) {
+  const { test, expect, vi } = import.meta.vitest;
+  const { createRoot } = await import("./");
+  vi.useFakeTimers();
+  test("get/set round-trip", () => {
+    const schema = set<string>();
+    const entry = createRoot(schema);
+    expect(entry.get()).toBe(SET_EMPTY);
+    entry.$("a").set(true);
+    expect(entry.get()).toEqual(new ReadonlySetImpl(["a"]));
+    entry.$("b").set(true);
+    expect(entry.get()).toEqual(new ReadonlySetImpl(["a", "b"]));
+    entry.$("a").set(false);
+    expect(entry.get()).toEqual(new ReadonlySetImpl(["b"]));
+    entry.set(new Set(["c", "d"]));
+    expect(entry.get()).toEqual(new ReadonlySetImpl(["c", "d"]));
+  });
+  test("hasValue/unset", () => {
+    const schema = set<string>();
+    const entry = createRoot(schema);
+    expect(entry.hasValue()).toBe(false);
+    entry.$("a").set(true);
+    expect(entry.hasValue()).toBe(true);
+    entry.unset();
+    expect(entry.get()).toEqual(SET_EMPTY);
+    expect(entry.hasValue()).toBe(false);
+  });
+  test("mutations", () => {
+    const entry = createRoot(set<string>());
+    expect(entry.get()).toBe(SET_EMPTY);
+    entry.mutations.add("a");
+    expect(entry.get()).toEqual(new ReadonlySetImpl(["a"]));
+    entry.mutations.add("b");
+    expect(entry.get()).toEqual(new ReadonlySetImpl(["a", "b"]));
+    entry.mutations.delete("a");
+    expect(entry.get()).toEqual(new ReadonlySetImpl(["b"]));
+    entry.mutations.clear();
+    expect(entry.get()).toBe(SET_EMPTY);
+  });
+}
