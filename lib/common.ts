@@ -17,13 +17,6 @@ type MemberEntries<T extends AnyMembers> = {
 
 export const VALUE_UNSET = Symbol("value unset");
 export const VALUE_KEEP = Symbol("value keep");
-const ENTRY_DESTROYED = Symbol("entry destroyed");
-
-export class DestroyedError extends Error {
-  constructor() {
-    super("This object has been destroyed and cannot be used");
-  }
-}
 
 export class NotImplementedError extends Error {
   constructor() {
@@ -51,8 +44,6 @@ export type Listener<T, TParent, TMembers extends AnyMembers, TMutations extends
   entry: Entry<T, TParent, TMembers, TMutations>,
 ) => void;
 export type Cleanup = (this: void) => void;
-
-const MAP_EMPTY = new Map<never, never>();
 
 export interface Schema<
   T = any,
@@ -102,9 +93,8 @@ export interface Entry<
   notify(): void;
   subscribe(listener: Listener<T, TParent, TMembers, TMutations>): Cleanup;
   isEmpty(): boolean;
-  isDestroyed(): boolean;
   hasValue(): boolean;
-  members(): IteratorObject<MemberPairs<TMembers>>;
+  members(): IterableIterator<MemberPairs<TMembers>, undefined>;
   $<K extends keyof TMembers>(key: K): MemberEntries<TMembers>[K];
   get mutations(): TMutations;
   get parent(): Entry<TParent> | undefined;
@@ -119,19 +109,26 @@ class EntryImpl<
   TMutations extends AnyMutations = any,
 > implements Entry<T, TParent, TMembers, TMutations>
 {
-  private _schema: Schema<T, TParent, TMembers, TMutations> | typeof ENTRY_DESTROYED;
-  private _value: T | typeof VALUE_UNSET = VALUE_UNSET;
-  private _previous: T | typeof VALUE_UNSET = VALUE_UNSET;
-  private _listeners: Set<Listener<T, TParent, TMembers, TMutations>> | undefined;
-  private _parent: EntryImpl<TParent> | undefined;
-  private _members: Map<string, Entry> | undefined = undefined;
-  private _manager: Manager;
-  private _mutations: TMutations | undefined;
-  private _isComputing: boolean = false;
-  private _default: T | typeof VALUE_UNSET = VALUE_UNSET;
+  private declare _schema: Schema<T, TParent, TMembers, TMutations>;
+  private declare _value: T | typeof VALUE_UNSET;
+  private declare _previous: T | typeof VALUE_UNSET;
+  private declare _listeners: Set<Listener<T, TParent, TMembers, TMutations>> | undefined;
+  private declare _parent: EntryImpl<TParent> | undefined;
+  private declare _members: Map<string, ReturnType<typeof Proxy.revocable>> | undefined;
+  private declare _manager: Manager;
+  private declare _mutations: TMutations | undefined;
+  private declare _isComputing: boolean;
+  private declare _default: T | typeof VALUE_UNSET;
 
   constructor(schema: Schema<T, TParent, TMembers, TMutations>, parent: EntryImpl | Manager) {
     this._schema = schema;
+    this._value = VALUE_UNSET;
+    this._previous = VALUE_UNSET;
+    this._listeners = undefined;
+    this._members = undefined;
+    this._mutations = undefined;
+    this._default = VALUE_UNSET;
+    this._isComputing = false;
     if (parent instanceof EntryImpl) {
       this._parent = parent;
       this._manager = parent._manager;
@@ -146,9 +143,6 @@ class EntryImpl<
   }
 
   get default(): T {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     if (this._default === VALUE_UNSET) {
       this._default = this._schema.computeDefault();
     }
@@ -156,9 +150,6 @@ class EntryImpl<
   }
 
   get(): T {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     if (this._value === VALUE_UNSET) {
       try {
         if (this._isComputing) {
@@ -178,16 +169,10 @@ class EntryImpl<
   }
 
   get kind(): Kind {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     return this._schema.kind;
   }
 
   hasValue(): boolean {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     return this._schema.hasValue(this, this._value);
   }
 
@@ -195,14 +180,7 @@ class EntryImpl<
     return !(this._listeners?.size || this._members?.size || this.hasValue());
   }
 
-  isDestroyed(): boolean {
-    return this._schema === ENTRY_DESTROYED;
-  }
-
   set(value: T): void {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     const newValue = this._schema.change(this, value);
     if (newValue !== VALUE_KEEP) {
       this._value = newValue;
@@ -211,9 +189,6 @@ class EntryImpl<
   }
 
   unset(): void {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     if (this.kind === KIND_WIDENING) {
       for (const [_key, member] of this.members()) {
         member.unset();
@@ -223,9 +198,6 @@ class EntryImpl<
   }
 
   invalidate(): void {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     const { kind } = this._schema;
     if (kind === KIND_NARROWING) {
       if (this._manager.scheduleRecompute(this)) {
@@ -255,24 +227,16 @@ class EntryImpl<
   }
 
   garbageCollect(): void {
-    if (this._schema === ENTRY_DESTROYED) {
-      return; // Already destroyed, nothing to collect
-    }
-    for (const [key, member] of this.members()) {
-      if (member.isDestroyed()) {
-        this._members?.delete(String(key));
+    if (this._members) {
+      for (const [key, { revoke, proxy: member }] of this._members.entries()) {
+        if ((member as EntryImpl).isEmpty()) {
+          this._members.delete(String(key));
+          revoke();
+        }
       }
     }
-    if (this._parent && this.isEmpty()) {
-      const parent = this._parent;
-      this._schema = ENTRY_DESTROYED;
-      this._value = VALUE_UNSET;
-      this._previous = VALUE_UNSET;
-      this._listeners = undefined;
-      this._members = undefined;
-      this._parent = undefined;
-      Object.freeze(this);
-      parent.garbageCollect();
+    if (this.isEmpty()) {
+      this._parent?.garbageCollect();
     }
   }
 
@@ -300,9 +264,6 @@ class EntryImpl<
   }
 
   recompute(): void {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     const newValue = this._schema.compute(this, this._value);
     if (newValue !== VALUE_KEEP) {
       this._value = newValue;
@@ -310,30 +271,38 @@ class EntryImpl<
     }
   }
 
-  members() {
-    return (this._members ?? MAP_EMPTY).entries() as IteratorObject<MemberPairs<TMembers>>;
+  members(): IterableIterator<MemberPairs<TMembers>, undefined> {
+    this._members ??= new Map();
+    const inner = this._members.entries();
+    return {
+      next() {
+        const result = inner.next();
+        if (result.done) {
+          return result;
+        }
+        const [key, { proxy: value }] = result.value;
+        return {
+          value: [key, value] as MemberPairs<TMembers>,
+        };
+      },
+      [Symbol.iterator]() {
+        return this;
+      },
+    };
   }
 
   $<K extends keyof TMembers>(key: K): MemberEntries<TMembers>[K] {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     let member = this._members?.get(String(key));
     if (!member) {
       const schemaMember = this._schema.getMember(key);
-      if (schemaMember) {
-        member = new EntryImpl(schemaMember, this);
-        this._members ??= new Map();
-        this._members.set(String(key), member);
-      }
+      member = Proxy.revocable(new EntryImpl(schemaMember, this), {});
+      this._members ??= new Map();
+      this._members.set(String(key), member);
     }
-    return member as MemberEntries<TMembers>[K];
+    return member.proxy as MemberEntries<TMembers>[K];
   }
 
   get mutations(): TMutations {
-    if (this._schema === ENTRY_DESTROYED) {
-      throw new DestroyedError();
-    }
     this._mutations ??= Object.freeze(this._schema.mutations(this));
     return this._mutations;
   }
@@ -342,16 +311,21 @@ class EntryImpl<
 type Scheduler = (callback: () => void) => number | undefined;
 
 class Manager {
-  private _timeoutId: number | undefined;
-  private _updateIteration: number = 0;
-  private readonly _updateIterationMax: number = 3; // Maximum iterations to prevent infinite loops
-  private readonly _update: () => void;
-  private readonly _scheduler: Scheduler;
-  private readonly _toNotify = new Set<EntryImpl>();
-  private readonly _toRecompute = new Set<EntryImpl>();
-  private readonly _toDestroy = new Set<EntryImpl>();
+  private declare _timeoutId: number | undefined;
+  private declare _updateIteration: number;
+  private declare readonly _updateIterationMax: number; // Maximum iterations to prevent infinite loops
+  private declare readonly _update: () => void;
+  private declare readonly _scheduler: Scheduler;
+  private declare readonly _toNotify: Set<EntryImpl>;
+  private declare readonly _toRecompute: Set<EntryImpl>;
+  private declare readonly _toDestroy: Set<EntryImpl>;
 
   constructor(scheduler: Scheduler) {
+    this._updateIteration = 0;
+    this._updateIterationMax = 3;
+    this._toNotify = new Set();
+    this._toRecompute = new Set();
+    this._toDestroy = new Set();
     this._update = this.update.bind(this);
     this._scheduler = scheduler;
   }
@@ -418,7 +392,7 @@ export function createRoot<
   TMutations extends AnyMutations,
 >(
   schema: Schema<T, TParent, TMembers, TMutations>,
-  scheduler: Scheduler = setTimeout,
+  scheduler: Scheduler = (u) => setTimeout(u, 0),
 ): Entry<T, TParent, TMembers, TMutations> {
   return new EntryImpl(schema, new Manager(scheduler));
 }
