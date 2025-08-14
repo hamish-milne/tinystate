@@ -40,6 +40,7 @@ Schema types:
   Dynamic:
     ✔ Basic implementation @done(25-08-14 17:52)
     ✔ Unit tests @done(25-08-14 17:52)
+    ☐ Fix typing for Partial<> values
 Helpers:
   ✔ Create schema from default values @done(25-08-11 12:57)
   ✔ Form text field @done(25-08-11 12:57)

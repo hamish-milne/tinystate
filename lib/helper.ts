@@ -1,6 +1,7 @@
 import { type ArraySchema, array } from "./array";
 import { type Empty, type Entry, isSchema, type Schema } from "./common";
 import { type Computed, computed } from "./computed";
+import { convert } from "./convert";
 import { type ObjectSchema, object } from "./object";
 import { type Scalar, scalar } from "./scalar";
 import { sync } from "./sync";
@@ -141,10 +142,27 @@ export function formRadio<K extends string, TMethod extends MethodProp | Lowerca
   };
 }
 
+export function storage(zone: Storage, key: string, defaultValue: string) {
+  return sync(
+    () => zone.getItem(key) ?? defaultValue,
+    (value) => zone.setItem(key, value),
+  );
+}
+
+export function fromJsonString<T>() {
+  return convert<string, T>(JSON.parse, JSON.stringify);
+}
+
+export function toJsonString<T>() {
+  return convert<T, string>(JSON.stringify, JSON.parse);
+}
+
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  const { KIND_SCALAR, KIND_WIDENING, createRoot, scalar } = await import("./");
+  const { KIND_SCALAR, KIND_WIDENING, createRoot, scalar, extend, extendDynamic } = await import(
+    "./"
+  );
   vi.useFakeTimers();
   test("schema of scalar", () => {
     const obj = schema(42);
@@ -203,5 +221,28 @@ TEST: if (import.meta.vitest) {
     expect(entry.get()).toBe("option2");
     expect(node1.checked).toBe(false);
     expect(node2.checked).toBe(true);
+  });
+  test("storage with JSON", () => {
+    const obj = { a: 1, b: "test" };
+    const zone = window.localStorage;
+    zone.clear();
+    const schema = extend(storage(zone, "testKey", "{}"), {
+      value: extendDynamic(fromJsonString<typeof obj>()),
+    });
+    const entry = createRoot(schema).$("value");
+    expect(entry.get()).toEqual({});
+    entry.set(obj);
+    vi.runAllTimers();
+    expect(zone.getItem("testKey")).toBe(JSON.stringify(obj));
+    expect(entry.get()).toEqual(obj);
+    zone.setItem("testKey", JSON.stringify({ a: 2, b: "updated" }));
+    entry.parent.invalidate();
+    vi.runAllTimers();
+    expect(entry.get()).toEqual({ a: 2, b: "updated" });
+    expect(entry.$("b").get()).toBe("updated");
+    zone.removeItem("testKey");
+    entry.parent.invalidate();
+    vi.runAllTimers();
+    expect(entry.get()).toEqual({});
   });
 }

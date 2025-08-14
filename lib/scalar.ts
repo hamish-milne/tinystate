@@ -16,13 +16,13 @@ export function scalar<T>(
       if (value === VALUE_UNSET) {
         return defaultValue;
       }
-      return value;
+      return VALUE_KEEP;
     },
     computeDefault() {
       return defaultValue;
     },
-    change(entry, value) {
-      if (compare(value, entry.get())) {
+    change(entry, value, prev) {
+      if (prev !== VALUE_UNSET && compare(value, prev)) {
         return VALUE_KEEP;
       }
       entry.invalidate();

@@ -62,7 +62,11 @@ export interface Schema<
     value: T | typeof VALUE_UNSET,
   ): T | typeof VALUE_KEEP;
   computeDefault(): T;
-  change(entry: Entry<T, TParent, TMembers, TMutations>, value: T): T | typeof VALUE_KEEP;
+  change(
+    entry: Entry<T, TParent, TMembers, TMutations>,
+    value: T,
+    prev: T | typeof VALUE_UNSET,
+  ): T | typeof VALUE_KEEP;
   getMember<K extends keyof TMembers>(key: K): TMembers[K];
   getMember(key: keyof TMembers): TMembers[keyof TMembers];
   get kind(): Kind;
@@ -101,7 +105,7 @@ export interface Entry<
   isEmpty(): boolean;
   hasValue(): boolean;
   members(): IterableIterator<MemberPairs<TMembers>, undefined>;
-  $<K extends keyof TMembers>(key: K): MemberEntries<TMembers>[K];
+  $<K extends keyof TMembers>(key: K): EntryOf<TMembers[K]>;
   get mutations(): TMutations;
   get parent(): Entry<TParent>;
   get kind(): Kind;
@@ -182,7 +186,7 @@ class EntryImpl<
   }
 
   set(value: T): void {
-    const newValue = this._schema.change(this, value);
+    const newValue = this._schema.change(this, value, this._value);
     if (newValue !== VALUE_KEEP) {
       this._value = newValue;
       this._checkDelete();
@@ -200,16 +204,16 @@ class EntryImpl<
 
   invalidate(): void {
     const { kind } = this._schema;
-    if (kind === KIND_NARROWING) {
+    if (kind === KIND_WIDENING) {
+      this._value = VALUE_UNSET;
+    } else {
       if (this._manager.scheduleRecompute(this)) {
         for (const [_, member] of this.members()) {
           member.invalidate();
         }
       }
-    } else {
-      if (kind === KIND_WIDENING) {
-        this._value = VALUE_UNSET;
-      }
+    }
+    if (kind !== KIND_NARROWING) {
       this._parent?.invalidate();
       if (this._manager.scheduleNotify(this)) {
         for (const [_, member] of this.members()) {
@@ -392,7 +396,7 @@ export function createRoot<
   TMutations extends AnyMutations,
 >(
   schema: Schema<T, TParent, TMembers, TMutations>,
-  scheduler: Scheduler = (u) => setTimeout(u, 0),
+  scheduler: Scheduler = (u) => window.setTimeout(u, 0),
 ): Entry<T, TParent, TMembers, TMutations> {
   return new EntryImpl(schema, new Manager(scheduler));
 }

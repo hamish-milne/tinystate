@@ -1,5 +1,5 @@
 import type { Kind } from "./common";
-import { KIND_SCALAR, NotImplementedError, VALUE_KEEP } from "./common";
+import { KIND_SCALAR, NotImplementedError, VALUE_KEEP, VALUE_UNSET } from "./common";
 import type { Scalar } from "./scalar";
 
 export function sync<T>(
@@ -14,11 +14,12 @@ export function sync<T>(
     computeDefault() {
       throw new NotImplementedError();
     },
-    change(entry, value) {
-      if (compare(value, entry.get())) {
+    change(entry, value, prev) {
+      if (prev !== VALUE_UNSET && compare(value, prev)) {
         return VALUE_KEEP;
       }
       setter(value);
+      entry.invalidate();
       return value;
     },
     getMember(_key: never): never {

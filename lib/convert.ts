@@ -1,13 +1,12 @@
-import type { AnyMembers, Empty, Schema } from "./common";
-import { narrowing, VALUE_KEEP } from "./common";
+import type { Empty, Schema } from "./common";
+import { NotImplementedError, narrowing, VALUE_KEEP } from "./common";
 
-type ConvertSchema<TIn, TOut, TMembers extends AnyMembers> = Schema<TOut, TIn, TMembers, Empty>;
+type ConvertSchema<TIn, TOut> = Schema<TOut, TIn, Empty, Empty>;
 
-export function convert<TIn, TOut, TMembers extends AnyMembers>(
+export function convert<TIn, TOut>(
   getter: (parent: TIn) => TOut,
   setter: (value: TOut) => TIn,
-  members: TMembers = {} as TMembers,
-): ConvertSchema<TIn, TOut, TMembers> {
+): ConvertSchema<TIn, TOut> {
   return narrowing({
     compute(entry, _value) {
       return getter(entry.parent.get());
@@ -16,8 +15,8 @@ export function convert<TIn, TOut, TMembers extends AnyMembers>(
       entry.parent.set(setter(value));
       return VALUE_KEEP;
     },
-    getMember<K extends keyof TMembers>(key: K) {
-      return members[key];
+    getMember(_key: never): never {
+      throw new NotImplementedError();
     },
   });
 }
@@ -25,13 +24,15 @@ export function convert<TIn, TOut, TMembers extends AnyMembers>(
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  const { createRoot, scalar, object } = await import("./");
+  const { createRoot, scalar, object, extend } = await import("./");
   vi.useFakeTimers();
 
   test("convert round-trip", () => {
-    const schema = convert(
-      (parent: { value: number }) => parent.value,
-      (value: number) => ({ value }),
+    const schema = extend(
+      convert(
+        (parent: { value: number }) => parent.value,
+        (value: number) => ({ value }),
+      ),
       { value: scalar(0) },
     );
     const entry = createRoot(

@@ -1,17 +1,25 @@
-import type { Empty, Schema } from "./common";
+import type { Empty, Schema, ValueOf } from "./common";
 import { narrowing, VALUE_KEEP } from "./common";
+import { extend } from "./extend";
 
-type DynamicSchema<TParent, TKey extends keyof TParent> = Schema<
+export type DynamicSchema<TParent, TKey extends keyof TParent> = Schema<
   TParent[TKey],
   TParent,
   DynamicMembers<TParent[TKey]>,
   Empty
 >;
-type DynamicMembers<T> = { [K in keyof T]: DynamicSchema<T, K> };
 
-export function dynamic<TParent, TKey extends keyof TParent>(
+// NOTE: The conditional in DynamicMembers and the two 'as any' casts below are necessary
+// to avoid a strange TypeScript issue that otherwise causes the type of DynamicMembers
+// to be inferred as `never`.
+
+export type DynamicMembers<T> = T extends Record<any, any>
+  ? { [K in keyof T]: DynamicSchema<T, K> }
+  : Empty;
+
+export function dynamic<TParent extends Record<any, any>, TKey extends keyof TParent>(
   key: TKey,
-): DynamicSchema<TParent, TKey> {
+): DynamicMembers<TParent>[TKey] {
   return narrowing<TParent[TKey], TParent, DynamicMembers<TParent[TKey]>>({
     compute(entry, _value) {
       return entry.parent.get()[key];
@@ -26,8 +34,12 @@ export function dynamic<TParent, TKey extends keyof TParent>(
       entry.parent.set(copy);
       return VALUE_KEEP;
     },
-    getMember: dynamic,
-  });
+    getMember: dynamic as any,
+  }) as any;
+}
+
+export function extendDynamic<T extends Schema>(schema: T) {
+  return extend<T, DynamicMembers<ValueOf<T>>, Empty>(schema, dynamic);
 }
 
 /* v8 ignore start -- @preserve */
@@ -37,7 +49,7 @@ TEST: if (import.meta.vitest) {
   vi.useFakeTimers();
 
   test("dynamic object", () => {
-    const schema = extend(scalar({ value: 0 }), dynamic);
+    const schema = extendDynamic(scalar({ value: 0 }));
     const entry = createRoot(schema);
     expect(entry.get()).toEqual({ value: 0 });
     entry.$("value").set(42);
