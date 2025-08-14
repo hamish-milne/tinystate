@@ -65,7 +65,7 @@ export type MethodProp = "onChange" | "onInput" | "onBlur";
 export function formField<
   TValue extends ValueProp,
   T extends NonNullable<HTMLInputElement[TValue]>,
-  TMethod extends MethodProp,
+  TMethod extends MethodProp | Lowercase<MethodProp>,
 >(entry: Entry<T>, valueProp: TValue, method: TMethod) {
   return {
     ref(node: HTMLInputElement | null) {
@@ -89,7 +89,10 @@ export function formField<
   };
 }
 
-export function formCheckbox(entry: Entry<boolean>) {
+export function formCheckbox<TMethod extends MethodProp | Lowercase<MethodProp>>(
+  entry: Entry<boolean>,
+  method: TMethod = "onChange" as TMethod,
+) {
   return {
     ref(node: HTMLInputElement | null) {
       if (node) {
@@ -98,7 +101,7 @@ export function formCheckbox(entry: Entry<boolean>) {
         });
       }
     },
-    onChange(event: Event) {
+    [method](event: Event) {
       const { target } = event;
       if (!(target instanceof HTMLInputElement)) {
         return;
@@ -110,18 +113,20 @@ export function formCheckbox(entry: Entry<boolean>) {
   };
 }
 
-export function formRadio<K extends string>(entry: Entry<K>, option: K) {
+export function formRadio<K extends string, TMethod extends MethodProp | Lowercase<MethodProp>>(
+  entry: Entry<K>,
+  option: K,
+  method: TMethod = "onChange" as TMethod,
+) {
   return {
     ref(node: HTMLInputElement | null) {
       if (node) {
         return entry.subscribe((value) => {
-          if (option === value) {
-            node.checked = true;
-          }
+          node.checked = value === option;
         });
       }
     },
-    onChange(event: Event) {
+    [method](event: Event) {
       const { target } = event;
       if (!(target instanceof HTMLInputElement)) {
         return;
@@ -134,4 +139,69 @@ export function formRadio<K extends string>(entry: Entry<K>, option: K) {
     value: option,
     type: "radio",
   };
+}
+
+/* v8 ignore start -- @preserve */
+TEST: if (import.meta.vitest) {
+  const { test, expect, vi } = import.meta.vitest;
+  const { KIND_SCALAR, KIND_WIDENING, createRoot, scalar } = await import("./");
+  vi.useFakeTimers();
+  test("schema of scalar", () => {
+    const obj = schema(42);
+    expect(obj.kind).toBe(KIND_SCALAR);
+  });
+  test("schema of object", () => {
+    const obj = schema({ a: 1, b: "test" });
+    expect(obj.kind).toBe(KIND_WIDENING);
+    expect(obj.computeDefault()).toEqual({ a: 1, b: "test" });
+  });
+  test("schema of array", () => {
+    const obj = schema([]);
+    expect(obj.kind).toBe(KIND_WIDENING);
+  });
+  test("form field", () => {
+    const entry = createRoot(scalar("test"));
+    const field = formField(entry, "value", "oninput");
+    expect(field.defaultValue).toBe("test");
+    const node = document.createElement("input");
+    Object.assign(node, field);
+    field.ref(node);
+    expect(node.value).toBe("test");
+    node.value = "changed";
+    node.dispatchEvent(new Event("input"));
+    vi.runAllTimers();
+    expect(entry.get()).toBe("changed");
+  });
+  test("form checkbox", () => {
+    const entry = createRoot(scalar(false));
+    const checkbox = formCheckbox(entry, "onchange");
+    const node = document.createElement("input");
+    Object.assign(node, checkbox);
+    node.type = "checkbox";
+    checkbox.ref(node);
+    expect(node.checked).toBe(false);
+    node.checked = true;
+    node.dispatchEvent(new Event("change"));
+    vi.runAllTimers();
+    expect(entry.get()).toBe(true);
+  });
+  test("form radio", () => {
+    const entry = createRoot(scalar("option1"));
+    const radio1 = formRadio(entry, "option1", "onchange");
+    const radio2 = formRadio(entry, "option2", "onchange");
+    const node1 = document.createElement("input");
+    const node2 = document.createElement("input");
+    Object.assign(node1, radio1);
+    Object.assign(node2, radio2);
+    radio1.ref(node1);
+    radio2.ref(node2);
+    expect(node1.checked).toBe(true);
+    expect(node2.checked).toBe(false);
+    node2.checked = true;
+    node2.dispatchEvent(new Event("change"));
+    vi.runAllTimers();
+    expect(entry.get()).toBe("option2");
+    expect(node1.checked).toBe(false);
+    expect(node2.checked).toBe(true);
+  });
 }

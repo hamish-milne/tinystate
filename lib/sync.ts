@@ -14,8 +14,8 @@ export function sync<T>(
     computeDefault() {
       throw new NotImplementedError();
     },
-    change(_entry, value) {
-      if (compare(value, value)) {
+    change(entry, value) {
+      if (compare(value, entry.get())) {
         return VALUE_KEEP;
       }
       setter(value);
@@ -29,7 +29,7 @@ export function sync<T>(
     },
     mutations(entry) {
       return {
-        set: (value: T) => this.change(entry, value),
+        set: (value: T) => entry.set(value),
       };
     },
     hasValue(_entry, _value) {
@@ -39,4 +39,28 @@ export function sync<T>(
       // Sync schemas do not support unset, as they are derived from a getter
     },
   };
+}
+
+/* v8 ignore start -- @preserve */
+TEST: if (import.meta.vitest) {
+  const { test, expect, vi } = import.meta.vitest;
+  vi.useFakeTimers();
+  const { createRoot } = await import("./");
+  test("sync schema", () => {
+    let value = 42;
+    const schema = sync(
+      () => value,
+      (newValue) => {
+        value = newValue;
+      },
+    );
+    const entry = createRoot(schema);
+    expect(entry.get()).toBe(42);
+    entry.set(100);
+    vi.runAllTimers();
+    expect(entry.get()).toBe(100);
+    entry.mutations.set(42);
+    vi.runAllTimers();
+    expect(entry.get()).toBe(42);
+  });
 }

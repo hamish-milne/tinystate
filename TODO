@@ -30,11 +30,19 @@ Schema types:
     ✔ Basic implementation @done(25-08-11 12:24)
     ✔ Unit tests @done(25-08-11 21:38)
     ☐ Always recompute synchronously
+    ☐ Stateful computed values
   Sync:
     ✔ Basic implementation @done(25-08-11 12:24)
-    ☐ Unit tests
+    ✔ Unit tests @done(25-08-14 17:52)
+  Convert:
+    ✔ Basic implementation @done(25-08-14 17:52)
+    ✔ Unit tests @done(25-08-14 14:46)
+  Dynamic:
+    ✔ Basic implementation @done(25-08-14 17:52)
+    ✔ Unit tests @done(25-08-14 17:52)
 Helpers:
   ✔ Create schema from default values @done(25-08-11 12:57)
   ✔ Form text field @done(25-08-11 12:57)
   ✔ Form checkbox @done(25-08-11 12:57)
   ✔ Form radio button @done(25-08-11 12:57)
+  ✔ Unit tests @done(25-08-14 17:52)

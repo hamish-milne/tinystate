@@ -1,5 +1,5 @@
 export type AnyMembers = Record<string | number | symbol, Schema>;
-export type AnyMutations = Record<string, (...args: any[]) => void>;
+export type AnyMutations = Record<string, (this: void, ...args: any[]) => void>;
 
 export type EntryOf<T extends Schema> = T extends Schema<infer A, infer B, infer C, infer D>
   ? Entry<A, B, C, D>
@@ -27,6 +27,12 @@ export class NotImplementedError extends Error {
 export class ReadonlyError extends Error {
   constructor() {
     super("This object is read-only and cannot be modified");
+  }
+}
+
+export class NoParentError extends Error {
+  constructor() {
+    super("This entry has no parent, so it cannot be used in this context");
   }
 }
 
@@ -97,7 +103,7 @@ export interface Entry<
   members(): IterableIterator<MemberPairs<TMembers>, undefined>;
   $<K extends keyof TMembers>(key: K): MemberEntries<TMembers>[K];
   get mutations(): TMutations;
-  get parent(): Entry<TParent> | undefined;
+  get parent(): Entry<TParent>;
   get kind(): Kind;
   get default(): T;
 }
@@ -131,6 +137,9 @@ class EntryImpl<
   }
 
   get parent() {
+    if (!this._parent) {
+      throw new NoParentError();
+    }
     return this._parent;
   }
 
@@ -386,4 +395,31 @@ export function createRoot<
   scheduler: Scheduler = (u) => setTimeout(u, 0),
 ): Entry<T, TParent, TMembers, TMutations> {
   return new EntryImpl(schema, new Manager(scheduler));
+}
+
+const NARROWING_PROTO = {
+  computeDefault() {
+    throw new NotImplementedError();
+  },
+  get kind(): Kind {
+    return KIND_NARROWING;
+  },
+  mutations() {
+    return {}; // Computed values do not support mutations
+  },
+  hasValue() {
+    return false; // Computed values never store state
+  },
+  unset() {
+    // Computed values do not support unset, as they are derived from their parent
+  },
+};
+
+export function narrowing<T, TParent, TMembers extends AnyMembers>(
+  schema: Omit<
+    Schema<T, TParent, TMembers, Empty>,
+    "computeDefault" | "kind" | "mutations" | "hasValue" | "unset"
+  >,
+) {
+  return Object.setPrototypeOf(schema, NARROWING_PROTO) as Schema<T, TParent, TMembers, Empty>;
 }

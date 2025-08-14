@@ -7,5 +7,6 @@ export default defineConfig({
       // reporter: ["text"],
       include: ["lib/**/*.{ts,tsx}"],
     },
+    environment: "happy-dom",
   },
 });

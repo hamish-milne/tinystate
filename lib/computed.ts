@@ -1,5 +1,5 @@
-import type { AnyMembers, Empty, Kind, Schema } from "./common";
-import { KIND_NARROWING, NotImplementedError, VALUE_KEEP, VALUE_UNSET } from "./common";
+import type { AnyMembers, Empty, Schema } from "./common";
+import { narrowing, VALUE_KEEP, VALUE_UNSET } from "./common";
 
 export type Computed<T, TParent, TMembers extends AnyMembers> = Schema<T, TParent, TMembers, Empty>;
 
@@ -8,20 +8,13 @@ export function computed<T, TParent, TMembers extends AnyMembers>(
   compare: (a: T, b: T) => boolean = Object.is,
   members: TMembers = {} as TMembers,
 ): Computed<T, TParent, TMembers> {
-  return {
+  return narrowing({
     compute(entry, value) {
-      const { parent } = entry;
-      if (!parent) {
-        throw new Error("Computed values require a parent entry to compute from");
-      }
-      const newValue = compute(parent.get());
+      const newValue = compute(entry.parent.get());
       if (value !== VALUE_UNSET && compare(value, newValue)) {
         return VALUE_KEEP; // No change needed
       }
       return newValue;
-    },
-    computeDefault() {
-      throw new NotImplementedError();
     },
     change(_entry, _value) {
       return VALUE_KEEP; // Computed values are not directly changeable
@@ -29,19 +22,7 @@ export function computed<T, TParent, TMembers extends AnyMembers>(
     getMember<K extends keyof TMembers>(key: K) {
       return members[key];
     },
-    get kind(): Kind {
-      return KIND_NARROWING;
-    },
-    mutations(_entry) {
-      return {}; // Computed values do not support mutations
-    },
-    hasValue(_entry, _value) {
-      return false; // Computed values never store state
-    },
-    unset(_entry) {
-      // Computed values do not support unset, as they are derived from their parent
-    },
-  };
+  });
 }
 
 /* v8 ignore start -- @preserve */
@@ -63,7 +44,7 @@ TEST: if (import.meta.vitest) {
     entry.$("b").set(2);
     vi.runAllTimers();
     expect(entry.$("sum").get()).toBe(7);
-    entry.$("sum").set(10); // Should not change anything, as computed
+    entry.$("sum").set(10);
     vi.runAllTimers();
     expect(entry.$("sum").get()).toBe(7);
   });
