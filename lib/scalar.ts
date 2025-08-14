@@ -49,7 +49,7 @@ export function scalar<T>(
 }
 
 /* v8 ignore start -- @preserve */
-if (import.meta.vitest) {
+TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot, VALUE_UNSET } = await import("./");
   vi.useFakeTimers();

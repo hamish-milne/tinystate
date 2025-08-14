@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build-lib": "esbuild ./lib/*.ts --outdir=./dist --drop-labels=TEST --legal-comments=none",
+    "build-lib-min": "esbuild --bundle --minify ./lib/index.ts --external:preact --outfile=./dist/min.js --mangle-props=^_ --drop-labels=TEST --format=esm --legal-comments=none --sourcemap"
   },
   "dependencies": {
     "preact": "^10.26.9"

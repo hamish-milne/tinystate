@@ -45,7 +45,7 @@ export function computed<T, TParent, TMembers extends AnyMembers>(
 }
 
 /* v8 ignore start -- @preserve */
-if (import.meta.vitest) {
+TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot, object, scalar } = await import("./");
   vi.useFakeTimers();

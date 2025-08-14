@@ -15,7 +15,16 @@
     "enabled": true,
     "rules": {
       "suspicious": {
-        "noExplicitAny": "off"
+        "noExplicitAny": "off",
+        "noConfusingLabels": {
+          "level": "warn",
+          "options": {
+            "allowedLabels": ["TEST"]
+          }
+        }
+      },
+      "correctness": {
+        "noUnusedLabels": "off"
       }
     }
   },
@@ -24,9 +33,9 @@
     "includes": [
       "**",
       "!**/.pnp*",
-      "!**/node_modules",
-      "!**/dist",
-      "!**/.yarn",
+      "!**/node_modules/**",
+      "!**/dist/**",
+      "!**/.yarn/**",
       "!**/.vscode/extensions.json"
     ]
   }

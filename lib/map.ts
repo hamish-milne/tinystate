@@ -98,7 +98,7 @@ export function map<K extends string, V extends Schema>(valueSchema: V): MapSche
 }
 
 /* v8 ignore start -- @preserve */
-if (import.meta.vitest) {
+TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot, scalar } = await import("./");
   vi.useFakeTimers();

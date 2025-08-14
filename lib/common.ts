@@ -107,34 +107,26 @@ class EntryImpl<
   TParent = any,
   TMembers extends AnyMembers = any,
   TMutations extends AnyMutations = any,
-> implements Entry<T, TParent, TMembers, TMutations>
-{
-  private declare _schema: Schema<T, TParent, TMembers, TMutations>;
-  private declare _value: T | typeof VALUE_UNSET;
-  private declare _previous: T | typeof VALUE_UNSET;
-  private declare _listeners: Set<Listener<T, TParent, TMembers, TMutations>> | undefined;
-  private declare _parent: EntryImpl<TParent> | undefined;
-  private declare _members: Map<string, ReturnType<typeof Proxy.revocable>> | undefined;
-  private declare _manager: Manager;
-  private declare _mutations: TMutations | undefined;
-  private declare _isComputing: boolean;
-  private declare _default: T | typeof VALUE_UNSET;
+> {
+  private readonly _schema: Schema<T, TParent, TMembers, TMutations>;
+  private _value: T | typeof VALUE_UNSET = VALUE_UNSET;
+  private _previous: T | typeof VALUE_UNSET = VALUE_UNSET;
+  private _listeners: Set<Listener<T, TParent, TMembers, TMutations>> | undefined;
+  private _parent: EntryImpl<TParent> | undefined;
+  private _members: Map<string, ReturnType<typeof Proxy.revocable>> | undefined;
+  private readonly _manager: Manager;
+  private _mutations: TMutations | undefined;
+  private _isComputing: boolean = false;
+  private _default: T | typeof VALUE_UNSET = VALUE_UNSET;
 
   constructor(schema: Schema<T, TParent, TMembers, TMutations>, parent: EntryImpl | Manager) {
     this._schema = schema;
-    this._value = VALUE_UNSET;
-    this._previous = VALUE_UNSET;
-    this._listeners = undefined;
-    this._members = undefined;
-    this._mutations = undefined;
-    this._default = VALUE_UNSET;
-    this._isComputing = false;
     if (parent instanceof EntryImpl) {
       this._parent = parent;
       this._manager = parent._manager;
     } else {
       this._manager = parent;
-      this._parent = undefined; // If parent is a manager, this entry has no parent
+      // If parent is a manager, this entry has no parent
     }
   }
 
@@ -184,7 +176,7 @@ class EntryImpl<
     const newValue = this._schema.change(this, value);
     if (newValue !== VALUE_KEEP) {
       this._value = newValue;
-      this.checkDelete();
+      this._checkDelete();
     }
   }
 
@@ -220,7 +212,7 @@ class EntryImpl<
     }
   }
 
-  private checkDelete() {
+  private _checkDelete() {
     if (this.isEmpty()) {
       this._manager.scheduleDestroy(this);
     }
@@ -229,7 +221,7 @@ class EntryImpl<
   garbageCollect(): void {
     if (this._members) {
       for (const [key, { revoke, proxy: member }] of this._members.entries()) {
-        if ((member as EntryImpl).isEmpty()) {
+        if ((member as Entry).isEmpty()) {
           this._members.delete(String(key));
           revoke();
         }
@@ -247,7 +239,7 @@ class EntryImpl<
     this._listeners.add(listener);
     return () => {
       if (this._listeners?.delete(listener)) {
-        this.checkDelete();
+        this._checkDelete();
       }
     };
   }
@@ -308,45 +300,44 @@ class EntryImpl<
   }
 }
 
+export function isEntry(value: unknown): value is Entry {
+  return value instanceof EntryImpl;
+}
+
 type Scheduler = (callback: () => void) => number | undefined;
 
 class Manager {
-  private declare _timeoutId: number | undefined;
-  private declare _updateIteration: number;
-  private declare readonly _updateIterationMax: number; // Maximum iterations to prevent infinite loops
-  private declare readonly _update: () => void;
-  private declare readonly _scheduler: Scheduler;
-  private declare readonly _toNotify: Set<EntryImpl>;
-  private declare readonly _toRecompute: Set<EntryImpl>;
-  private declare readonly _toDestroy: Set<EntryImpl>;
+  #timeoutId: number | undefined;
+  #updateIteration: number = 0;
+  readonly #updateIterationMax: number = 3; // Maximum iterations to prevent infinite loops
+  readonly #update: () => void;
+  readonly #scheduler: Scheduler;
+  readonly #toNotify = new Set<EntryImpl>();
+  readonly #toRecompute = new Set<EntryImpl>();
+  readonly #toDestroy = new Set<EntryImpl>();
 
   constructor(scheduler: Scheduler) {
-    this._updateIteration = 0;
-    this._updateIterationMax = 3;
-    this._toNotify = new Set();
-    this._toRecompute = new Set();
-    this._toDestroy = new Set();
-    this._update = this.update.bind(this);
-    this._scheduler = scheduler;
+    this.#update = this.update.bind(this);
+    this.#scheduler = scheduler;
   }
 
   private scheduleUpdate() {
-    if (this._timeoutId === undefined) {
-      this._updateIteration++;
-      if (this._updateIteration > this._updateIterationMax) {
+    if (this.#timeoutId === undefined) {
+      this.#updateIteration++;
+      if (this.#updateIteration > this.#updateIterationMax) {
         throw new Error("Too many iterations in state manager timeout, possible infinite loop");
       }
-      this._timeoutId = this._scheduler(this._update);
+      this.#timeoutId = this.#scheduler(this.#update);
     }
   }
 
   private update() {
-    this._timeoutId = undefined;
+    this.#timeoutId = undefined;
 
     for (const [set, method] of [
-      [this._toRecompute, "recompute"],
-      [this._toNotify, "notify"],
-      [this._toDestroy, "garbageCollect"],
+      [this.#toRecompute, "recompute"],
+      [this.#toNotify, "notify"],
+      [this.#toDestroy, "garbageCollect"],
     ] as const) {
       const setCopy = Array.from(set);
       set.clear();
@@ -360,8 +351,8 @@ class Manager {
     }
 
     // Only reset the iteration count if another update was not scheduled
-    if (this._timeoutId === undefined) {
-      this._updateIteration = 0;
+    if (this.#timeoutId === undefined) {
+      this.#updateIteration = 0;
     }
   }
 
@@ -375,13 +366,13 @@ class Manager {
   }
 
   scheduleNotify(entry: EntryImpl): boolean {
-    return this.schedule(entry, this._toNotify);
+    return this.schedule(entry, this.#toNotify);
   }
   scheduleRecompute(entry: EntryImpl): boolean {
-    return this.schedule(entry, this._toRecompute);
+    return this.schedule(entry, this.#toRecompute);
   }
   scheduleDestroy(entry: EntryImpl): void {
-    this.schedule(entry, this._toDestroy);
+    this.schedule(entry, this.#toDestroy);
   }
 }
 

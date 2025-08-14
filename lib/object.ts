@@ -71,7 +71,7 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
 }
 
 /* v8 ignore start -- @preserve */
-if (import.meta.vitest) {
+TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot, object, scalar } = await import("./");
   vi.useFakeTimers();
