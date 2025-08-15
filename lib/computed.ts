@@ -30,6 +30,7 @@ TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot, object, scalar } = await import("./");
   vi.useFakeTimers();
+
   test("get value", async () => {
     const schema = object({
       a: scalar(3),

@@ -107,6 +107,7 @@ TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot } = await import("./");
   vi.useFakeTimers();
+
   test("get/set round-trip", () => {
     const schema = set<string>();
     const entry = createRoot(schema);
@@ -120,6 +121,7 @@ TEST: if (import.meta.vitest) {
     entry.set(new Set(["c", "d"]));
     expect(entry.get()).toEqual(new ReadonlySetImpl(["c", "d"]));
   });
+
   test("hasValue/unset", () => {
     const schema = set<string>();
     const entry = createRoot(schema);
@@ -130,6 +132,7 @@ TEST: if (import.meta.vitest) {
     expect(entry.get()).toEqual(SET_EMPTY);
     expect(entry.hasValue()).toBe(false);
   });
+
   test("mutations", () => {
     const entry = createRoot(set<string>());
     expect(entry.get()).toBe(SET_EMPTY);

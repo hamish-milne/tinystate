@@ -85,6 +85,7 @@ TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot } = await import("./");
   vi.useFakeTimers();
+
   test("set/get round-trip", () => {
     const entry = createRoot(array(scalar(666)));
     expect(entry.$("length").get()).toBe(0);

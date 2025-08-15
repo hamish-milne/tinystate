@@ -102,6 +102,7 @@ TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot, scalar } = await import("./");
   vi.useFakeTimers();
+
   test("get/set entries", () => {
     const schema = map(scalar(0));
     const entry = createRoot(schema);
@@ -122,6 +123,7 @@ TEST: if (import.meta.vitest) {
     entry.set(new Map([["key3", 3]]));
     expect(entry.get()).toEqual(new ReadonlyMapImpl([["key3", 3]]));
   });
+
   test("hasValue/unset", () => {
     const schema = map(scalar(0));
     const entry = createRoot(schema);
@@ -131,6 +133,7 @@ TEST: if (import.meta.vitest) {
     entry.unset();
     expect(entry.hasValue()).toBe(false);
   });
+
   test("mutations", () => {
     const schema = map(scalar(0));
     const entry = createRoot(schema);

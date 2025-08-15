@@ -164,19 +164,23 @@ TEST: if (import.meta.vitest) {
     "./"
   );
   vi.useFakeTimers();
+
   test("schema of scalar", () => {
     const obj = schema(42);
     expect(obj.kind).toBe(KIND_SCALAR);
   });
+
   test("schema of object", () => {
     const obj = schema({ a: 1, b: "test" });
     expect(obj.kind).toBe(KIND_WIDENING);
     expect(obj.computeDefault()).toEqual({ a: 1, b: "test" });
   });
+
   test("schema of array", () => {
     const obj = schema([]);
     expect(obj.kind).toBe(KIND_WIDENING);
   });
+
   test("form field", () => {
     const entry = createRoot(scalar("test"));
     const field = formField(entry, "value", "oninput");
@@ -190,6 +194,7 @@ TEST: if (import.meta.vitest) {
     vi.runAllTimers();
     expect(entry.get()).toBe("changed");
   });
+
   test("form checkbox", () => {
     const entry = createRoot(scalar(false));
     const checkbox = formCheckbox(entry, "onchange");
@@ -203,6 +208,7 @@ TEST: if (import.meta.vitest) {
     vi.runAllTimers();
     expect(entry.get()).toBe(true);
   });
+
   test("form radio", () => {
     const entry = createRoot(scalar("option1"));
     const radio1 = formRadio(entry, "option1", "onchange");
@@ -222,6 +228,7 @@ TEST: if (import.meta.vitest) {
     expect(node1.checked).toBe(false);
     expect(node2.checked).toBe(true);
   });
+
   test("storage with JSON", () => {
     const obj = { a: 1, b: "test" };
     const zone = window.localStorage;

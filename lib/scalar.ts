@@ -53,6 +53,7 @@ TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot, VALUE_UNSET } = await import("./");
   vi.useFakeTimers();
+
   test("get/set round-trip", () => {
     const schema = scalar(42);
     const entry = createRoot(schema);
@@ -62,6 +63,7 @@ TEST: if (import.meta.vitest) {
     entry.set(42);
     expect(entry.get()).toBe(42);
   });
+
   test("hasValue/unset", () => {
     const schema = scalar(42);
     const entry = createRoot(schema);
@@ -72,6 +74,7 @@ TEST: if (import.meta.vitest) {
     expect(entry.get()).toBe(42);
     expect(entry.hasValue()).toBe(false);
   });
+
   test("notify on change", () => {
     const schema = scalar(42);
     const entry = createRoot(schema);

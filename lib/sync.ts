@@ -45,8 +45,9 @@ export function sync<T>(
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  vi.useFakeTimers();
   const { createRoot } = await import("./");
+  vi.useFakeTimers();
+
   test("sync schema", () => {
     let value = 42;
     const schema = sync(

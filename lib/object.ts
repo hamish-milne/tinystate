@@ -75,6 +75,7 @@ TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
   const { createRoot, object, scalar } = await import("./");
   vi.useFakeTimers();
+
   test("get/set round-trip", () => {
     const schema = object({
       a: scalar(1),
@@ -87,6 +88,7 @@ TEST: if (import.meta.vitest) {
     entry.set({ a: 1, b: 2 });
     expect(entry.get()).toEqual({ a: 1, b: 2 });
   });
+
   test("hasValue/unset", () => {
     const schema = object({
       a: scalar(1),

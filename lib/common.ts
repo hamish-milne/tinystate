@@ -11,10 +11,6 @@ type MemberPairs<T extends AnyMembers> = {
   [K in keyof T]: [K, EntryOf<T[K]>];
 }[keyof T];
 
-type MemberEntries<T extends AnyMembers> = {
-  [K in keyof T]: T[K] extends Schema ? EntryOf<T[K]> : never;
-};
-
 export const VALUE_UNSET = Symbol("value unset");
 export const VALUE_KEEP = Symbol("value keep");
 
@@ -121,9 +117,9 @@ class EntryImpl<
   private readonly _schema: Schema<T, TParent, TMembers, TMutations>;
   private _value: T | typeof VALUE_UNSET = VALUE_UNSET;
   private _previous: T | typeof VALUE_UNSET = VALUE_UNSET;
-  private _listeners: Set<Listener<T, TParent, TMembers, TMutations>> | undefined;
-  private _parent: EntryImpl<TParent> | undefined;
-  private _members: Map<string, ReturnType<typeof Proxy.revocable>> | undefined;
+  private readonly _listeners = new Set<Listener<T, TParent, TMembers, TMutations>>();
+  private readonly _parent: EntryImpl<TParent> | undefined;
+  private readonly _members = new Map<string, ReturnType<typeof Proxy.revocable>>();
   private readonly _manager: Manager;
   private _mutations: TMutations | undefined;
   private _isComputing: boolean = false;
@@ -182,7 +178,7 @@ class EntryImpl<
   }
 
   isEmpty(): boolean {
-    return !(this._listeners?.size || this._members?.size || this.hasValue());
+    return !(this._listeners.size || this._members.size || this.hasValue());
   }
 
   set(value: T): void {
@@ -246,12 +242,9 @@ class EntryImpl<
   }
 
   subscribe(listener: Listener<T, TParent, TMembers, TMutations>): Cleanup {
-    if (!this._listeners) {
-      this._listeners = new Set();
-    }
     this._listeners.add(listener);
     return () => {
-      if (this._listeners?.delete(listener)) {
+      if (this._listeners.delete(listener)) {
         this._checkDelete();
       }
     };
@@ -277,7 +270,6 @@ class EntryImpl<
   }
 
   members(): IterableIterator<MemberPairs<TMembers>, undefined> {
-    this._members ??= new Map();
     const inner = this._members.entries();
     return {
       next() {
@@ -296,15 +288,14 @@ class EntryImpl<
     };
   }
 
-  $<K extends keyof TMembers>(key: K): MemberEntries<TMembers>[K] {
-    let member = this._members?.get(String(key));
+  $<K extends keyof TMembers>(key: K): EntryOf<TMembers[K]> {
+    let member = this._members.get(String(key));
     if (!member) {
       const schemaMember = this._schema.getMember(key);
       member = Proxy.revocable(new EntryImpl(schemaMember, this), {});
-      this._members ??= new Map();
       this._members.set(String(key), member);
     }
-    return member.proxy as MemberEntries<TMembers>[K];
+    return member.proxy as EntryOf<TMembers[K]>;
   }
 
   get mutations(): TMutations {
