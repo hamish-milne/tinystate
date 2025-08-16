@@ -30,13 +30,13 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
       return KIND_WIDENING;
     },
     compute(entry) {
-      const length = entry.$("length").get();
+      const length = entry.member("length").get();
       if (length === 0) {
         return ARRAY_EMPTY;
       }
       const value: ArrayValue<T>[number][] = new Array(length);
       for (let i = 0; i < length; i++) {
-        value[i] = entry.$(i).get();
+        value[i] = entry.member(i).get();
       }
       return value;
     },
@@ -44,9 +44,9 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
       return ARRAY_EMPTY;
     },
     change(entry, value): typeof VALUE_KEEP {
-      entry.$("length").set(value.length);
+      entry.member("length").set(value.length);
       for (let i = 0, l = value.length; i < l; i++) {
-        entry.$(i).set(value[i]);
+        entry.member(i).set(value[i]);
       }
       // We allow the members to call invalidate themselves, so we don't need to do anything here
       return VALUE_KEEP;
@@ -63,19 +63,19 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
     mutations(entry) {
       return {
         push: (value: ValueOf<T>) => {
-          const currentLength = entry.$("length").get();
-          entry.$(currentLength).set(value);
-          entry.$("length").set(currentLength + 1);
+          const currentLength = entry.member("length").get();
+          entry.member(currentLength).set(value);
+          entry.member("length").set(currentLength + 1);
         },
-        pop: () => entry.$("length").set(Math.max(0, entry.$("length").get() - 1)),
-        clear: () => entry.$("length").set(0),
+        pop: () => entry.member("length").set(Math.max(0, entry.member("length").get() - 1)),
+        clear: () => entry.member("length").set(0),
       };
     },
     hasValue(entry, _value) {
-      return entry.$("length").get() > 0;
+      return entry.member("length").get() > 0;
     },
     unset(entry) {
-      entry.$("length").set(0);
+      entry.member("length").set(0);
     },
   };
 }
@@ -88,20 +88,20 @@ TEST: if (import.meta.vitest) {
 
   test("set/get round-trip", () => {
     const entry = createRoot(array(scalar(666)));
-    expect(entry.$("length").get()).toBe(0);
+    expect(entry.length.get()).toBe(0);
     entry.set([1, 2, 3]);
-    expect(entry.$("length").get()).toBe(3);
-    expect(entry.$(0).get()).toBe(1);
-    expect(entry.$(1).get()).toBe(2);
-    expect(entry.$(2).get()).toBe(3);
+    expect(entry.length.get()).toBe(3);
+    expect(entry[0].get()).toBe(1);
+    expect(entry[1].get()).toBe(2);
+    expect(entry[2].get()).toBe(3);
     expect(entry.get()).toEqual([1, 2, 3]);
   });
 
   test("length change", () => {
     const entry = createRoot(array(scalar(666)));
-    entry.$("length").set(3);
+    entry.length.set(3);
     expect(entry.get()).toEqual([666, 666, 666]);
-    entry.$(4).set(1);
+    entry[4].set(1);
     expect(entry.get()).toEqual([666, 666, 666]);
   });
 
@@ -117,13 +117,13 @@ TEST: if (import.meta.vitest) {
   test("mutations", () => {
     const entry = createRoot(array(scalar(666)));
     expect(entry.get()).toEqual([]);
-    entry.mutations.push(1);
+    entry.push(1);
     expect(entry.get()).toEqual([1]);
-    entry.mutations.push(2);
+    entry.push(2);
     expect(entry.get()).toEqual([1, 2]);
-    entry.mutations.pop();
+    entry.pop();
     expect(entry.get()).toEqual([1]);
-    entry.mutations.clear();
+    entry.clear();
     expect(entry.get()).toEqual([]);
   });
 }

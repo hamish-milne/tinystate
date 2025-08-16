@@ -40,7 +40,7 @@ TEST: if (import.meta.vitest) {
         value: scalar(0),
         converted: schema,
       }),
-    ).$("converted");
+    ).member("converted");
     expect(entry.get()).toEqual(0);
     expect(entry.parent.get()).toEqual({ value: 0 });
     entry.set(42);

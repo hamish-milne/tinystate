@@ -38,15 +38,15 @@ TEST: if (import.meta.vitest) {
       sum: computed((parent) => parent.a + parent.b),
     });
     const entry = createRoot(schema);
-    expect(entry.$("sum").get()).toBe(7);
-    entry.$("a").set(5);
+    expect(entry.sum.get()).toBe(7);
+    entry.a.set(5);
     vi.runAllTimers();
-    expect(entry.$("sum").get()).toBe(9);
-    entry.$("b").set(2);
+    expect(entry.sum.get()).toBe(9);
+    entry.b.set(2);
     vi.runAllTimers();
-    expect(entry.$("sum").get()).toBe(7);
-    entry.$("sum").set(10);
+    expect(entry.sum.get()).toBe(7);
+    entry.sum.set(10);
     vi.runAllTimers();
-    expect(entry.$("sum").get()).toBe(7);
+    expect(entry.sum.get()).toBe(7);
   });
 }

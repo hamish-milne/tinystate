@@ -34,7 +34,7 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
     },
     change(entry, value): typeof VALUE_KEEP {
       for (const [key] of memberEntries) {
-        entry.$(key).set(value[key]);
+        entry.member(key).set(value[key]);
       }
       // We allow the members to call invalidate themselves, so we don't need to do anything here
       return VALUE_KEEP;

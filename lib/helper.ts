@@ -236,7 +236,7 @@ TEST: if (import.meta.vitest) {
     const schema = extend(storage(zone, "testKey", "{}"), {
       value: extendDynamic(fromJsonString<typeof obj>()),
     });
-    const entry = createRoot(schema).$("value");
+    const entry = createRoot(schema).value;
     expect(entry.get()).toEqual({});
     entry.set(obj);
     vi.runAllTimers();
@@ -246,7 +246,7 @@ TEST: if (import.meta.vitest) {
     entry.parent.invalidate();
     vi.runAllTimers();
     expect(entry.get()).toEqual({ a: 2, b: "updated" });
-    expect(entry.$("b").get()).toBe("updated");
+    expect(entry.b.get()).toBe("updated");
     zone.removeItem("testKey");
     entry.parent.invalidate();
     vi.runAllTimers();

@@ -28,10 +28,8 @@ export function sync<T>(
     get kind(): Kind {
       return KIND_SCALAR;
     },
-    mutations(entry) {
-      return {
-        set: (value: T) => entry.set(value),
-      };
+    mutations(_entry) {
+      return {};
     },
     hasValue(_entry, _value) {
       return false; // Sync schemas do not store values directly
@@ -61,7 +59,7 @@ TEST: if (import.meta.vitest) {
     entry.set(100);
     vi.runAllTimers();
     expect(entry.get()).toBe(100);
-    entry.mutations.set(42);
+    entry.set(42);
     vi.runAllTimers();
     expect(entry.get()).toBe(42);
   });

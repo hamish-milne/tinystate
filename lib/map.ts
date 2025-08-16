@@ -54,7 +54,7 @@ export function map<K extends string, V extends Schema>(valueSchema: V): MapSche
     },
     change(entry, value) {
       for (const [key, item] of value) {
-        entry.$(key).set(item);
+        entry.member(key).set(item);
       }
       for (const [key, member] of entry.members()) {
         if (!value.has(key)) {
@@ -69,8 +69,8 @@ export function map<K extends string, V extends Schema>(valueSchema: V): MapSche
     },
     mutations(entry) {
       return {
-        set: (key: K, value: V) => entry.$(key).set(value),
-        delete: (key: K) => entry.$(key).unset(),
+        set: (key: K, value: V) => entry.member(key).set(value),
+        delete: (key: K) => entry.member(key).unset(),
         clear: () => {
           for (const [_, member] of entry.members()) {
             member.unset(); // Clear all members
@@ -107,18 +107,18 @@ TEST: if (import.meta.vitest) {
     const schema = map(scalar(0));
     const entry = createRoot(schema);
     expect(entry.get()).toEqual(new ReadonlyMapImpl());
-    entry.$("key1").set(1);
+    entry.member("key1").set(1);
     expect(entry.get()).toEqual(new ReadonlyMapImpl([["key1", 1]]));
-    entry.$("key2").set(2);
+    entry.member("key2").set(2);
     expect(entry.get()).toEqual(
       new ReadonlyMapImpl([
         ["key1", 1],
         ["key2", 2],
       ]),
     );
-    entry.$("key1").unset();
+    entry.member("key1").unset();
     expect(entry.get()).toEqual(new ReadonlyMapImpl([["key2", 2]]));
-    entry.$("key2").unset();
+    entry.member("key2").unset();
     expect(entry.get()).toEqual(new ReadonlyMapImpl());
     entry.set(new Map([["key3", 3]]));
     expect(entry.get()).toEqual(new ReadonlyMapImpl([["key3", 3]]));
@@ -128,7 +128,7 @@ TEST: if (import.meta.vitest) {
     const schema = map(scalar(0));
     const entry = createRoot(schema);
     expect(entry.hasValue()).toBe(false);
-    entry.$("key1").set(1);
+    entry.member("key1").set(1);
     expect(entry.hasValue()).toBe(true);
     entry.unset();
     expect(entry.hasValue()).toBe(false);

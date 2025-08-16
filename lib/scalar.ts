@@ -1,11 +1,7 @@
 import type { Empty, Kind, Schema } from "./common";
 import { KIND_SCALAR, NotImplementedError, VALUE_KEEP, VALUE_UNSET } from "./common";
 
-type ScalarMutations<T> = {
-  set(value: T): void;
-};
-
-export type Scalar<T> = Schema<T, unknown, Empty, ScalarMutations<T>>;
+export type Scalar<T> = Schema<T, unknown, Empty, Empty>;
 
 export function scalar<T>(
   defaultValue: T,
@@ -34,10 +30,8 @@ export function scalar<T>(
     get kind(): Kind {
       return KIND_SCALAR;
     },
-    mutations(entry) {
-      return {
-        set: (value: T) => entry.set(value),
-      };
+    mutations(_entry) {
+      return {};
     },
     hasValue(_entry, value) {
       return value !== VALUE_UNSET && !compare(value, defaultValue);

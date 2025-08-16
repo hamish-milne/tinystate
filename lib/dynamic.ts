@@ -13,11 +13,13 @@ export type DynamicSchema<TParent, TKey extends keyof TParent> = Schema<
 // to avoid a strange TypeScript issue that otherwise causes the type of DynamicMembers
 // to be inferred as `never`.
 
-export type DynamicMembers<T> = T extends Record<any, any>
-  ? { [K in keyof T]: DynamicSchema<T, K> }
-  : Empty;
+export type DynamicMembers<T> = T extends unknown[]
+  ? { [K in number]: DynamicSchema<T, number> }
+  : T extends Record<any, any>
+    ? { [K in keyof T]: DynamicSchema<T, K> }
+    : Empty;
 
-export function dynamic<TParent extends Record<any, any>, TKey extends keyof TParent>(
+export function dynamic<TParent extends Record<any, any> | unknown[], TKey extends keyof TParent>(
   key: TKey,
 ): DynamicMembers<TParent>[TKey] {
   return narrowing<TParent[TKey], TParent, DynamicMembers<TParent[TKey]>>({
@@ -45,30 +47,30 @@ export function extendDynamic<T extends Schema>(schema: T) {
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  const { createRoot, scalar, extend } = await import(".");
+  const { createRoot, scalar } = await import(".");
   vi.useFakeTimers();
 
   test("dynamic object", () => {
     const schema = extendDynamic(scalar({ value: 0 }));
     const entry = createRoot(schema);
     expect(entry.get()).toEqual({ value: 0 });
-    entry.$("value").set(42);
+    entry.value.set(42);
     vi.runAllTimers();
     expect(entry.get()).toEqual({ value: 42 });
     entry.set({ value: 100 });
     vi.runAllTimers();
-    expect(entry.$("value").get()).toEqual(100);
+    expect(entry.member("value").get()).toEqual(100);
   });
 
   test("dynamic array", () => {
-    const schema = extend(scalar([1, 2, 3]), dynamic);
+    const schema = extendDynamic(scalar([1, 2, 3]));
     const entry = createRoot(schema);
     expect(entry.get()).toEqual([1, 2, 3]);
-    entry.$(0).set(42);
+    entry[0].set(42);
     vi.runAllTimers();
     expect(entry.get()).toEqual([42, 2, 3]);
     entry.set([100, 200, 300]);
     vi.runAllTimers();
-    expect(entry.$(0).get()).toEqual(100);
+    expect(entry.member(0).get()).toEqual(100);
   });
 }

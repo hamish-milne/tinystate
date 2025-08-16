@@ -1,4 +1,4 @@
-export type AnyMembers = Record<string | number | symbol, Schema>;
+export type AnyMembers = { [_ in string]: Schema } & { [_ in number]: Schema };
 export type AnyMutations = Record<string, (this: void, ...args: any[]) => void>;
 
 export type EntryOf<T extends Schema> = T extends Schema<infer A, infer B, infer C, infer D>
@@ -101,12 +101,39 @@ export interface Entry<
   isEmpty(): boolean;
   hasValue(): boolean;
   members(): IterableIterator<MemberPairs<TMembers>, undefined>;
-  $<K extends keyof TMembers>(key: K): EntryOf<TMembers[K]>;
+  member<K extends keyof TMembers>(key: K): EntryOf<TMembers[K]>;
   get mutations(): TMutations;
   get parent(): Entry<TParent>;
   get kind(): Kind;
   get default(): T;
 }
+
+const entryProxy: ProxyHandler<Entry> = {
+  get(target, p, _receiver) {
+    if (typeof p === "symbol" || p in target) {
+      return target[p as keyof Entry];
+    } else if (p in target.mutations) {
+      return target.mutations[p];
+    } else {
+      // biome-ignore lint/suspicious/noGlobalIsNan: we're deliberately coercing to number
+      return target.member(isNaN(p as unknown as number) ? p : Number(p));
+    }
+  },
+};
+
+export type ProxyOf<T> = T extends Schema<any, any, infer C, infer D>
+  ? (string extends keyof D
+      ? unknown
+      : {
+          [K in Exclude<keyof D, keyof Entry>]: D[K];
+        }) &
+      (string extends keyof C
+        ? unknown
+        : {
+            [K in Exclude<keyof C, keyof Entry>]: ProxyOf<C[K]>;
+          }) &
+      EntryOf<T>
+  : never;
 
 class EntryImpl<
   T = any,
@@ -288,14 +315,14 @@ class EntryImpl<
     };
   }
 
-  $<K extends keyof TMembers>(key: K): EntryOf<TMembers[K]> {
+  member<K extends keyof TMembers>(key: K): ProxyOf<TMembers[K]> {
     let member = this._members.get(String(key));
     if (!member) {
       const schemaMember = this._schema.getMember(key);
-      member = Proxy.revocable(new EntryImpl(schemaMember, this), {});
+      member = Proxy.revocable(new EntryImpl(schemaMember, this), entryProxy);
       this._members.set(String(key), member);
     }
-    return member.proxy as EntryOf<TMembers[K]>;
+    return member.proxy as ProxyOf<TMembers[K]>;
   }
 
   get mutations(): TMutations {
@@ -380,16 +407,11 @@ class Manager {
   }
 }
 
-export function createRoot<
-  T,
-  TParent,
-  TMembers extends AnyMembers,
-  TMutations extends AnyMutations,
->(
-  schema: Schema<T, TParent, TMembers, TMutations>,
+export function createRoot<T extends Schema>(
+  schema: T,
   scheduler: Scheduler = (u) => window.setTimeout(u, 0),
-): Entry<T, TParent, TMembers, TMutations> {
-  return new EntryImpl(schema, new Manager(scheduler));
+): ProxyOf<T> {
+  return new Proxy(new EntryImpl(schema, new Manager(scheduler)), entryProxy) as ProxyOf<T>;
 }
 
 const NARROWING_PROTO = {

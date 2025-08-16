@@ -64,7 +64,7 @@ export function set<K extends string>(): SetSchema<K> {
         }
       }
       for (const key of value) {
-        entry.$(key).set(true); // Set the member to true if it exists in the new set
+        entry.member(key).set(true); // Set the member to true if it exists in the new set
       }
       // We allow the members to call invalidate themselves, so we don't need to do anything here
       return VALUE_KEEP;
@@ -74,8 +74,8 @@ export function set<K extends string>(): SetSchema<K> {
     },
     mutations(entry) {
       return {
-        add: (key: K) => entry.$(key).set(true),
-        delete: (key: K) => entry.$(key).set(false),
+        add: (key: K) => entry.member(key).set(true),
+        delete: (key: K) => entry.member(key).set(false),
         clear: () => {
           for (const [_, member] of entry.members()) {
             member.set(false); // Clear all members
@@ -112,11 +112,11 @@ TEST: if (import.meta.vitest) {
     const schema = set<string>();
     const entry = createRoot(schema);
     expect(entry.get()).toBe(SET_EMPTY);
-    entry.$("a").set(true);
+    entry.member("a").set(true);
     expect(entry.get()).toEqual(new ReadonlySetImpl(["a"]));
-    entry.$("b").set(true);
+    entry.member("b").set(true);
     expect(entry.get()).toEqual(new ReadonlySetImpl(["a", "b"]));
-    entry.$("a").set(false);
+    entry.member("a").set(false);
     expect(entry.get()).toEqual(new ReadonlySetImpl(["b"]));
     entry.set(new Set(["c", "d"]));
     expect(entry.get()).toEqual(new ReadonlySetImpl(["c", "d"]));
@@ -126,7 +126,7 @@ TEST: if (import.meta.vitest) {
     const schema = set<string>();
     const entry = createRoot(schema);
     expect(entry.hasValue()).toBe(false);
-    entry.$("a").set(true);
+    entry.member("a").set(true);
     expect(entry.hasValue()).toBe(true);
     entry.unset();
     expect(entry.get()).toEqual(SET_EMPTY);

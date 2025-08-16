@@ -4,7 +4,7 @@ Core features:
   Entry:
     ✔ Basic implementation @done(25-08-11 12:24)
     ☐ Unit tests
-    ☐ Proxy for members/mutations
+    ✔ Proxy for members/mutations @done(25-08-16 15:58)
     ☐ Combine VALUE_UNSET and VALUE_KEEP
   Manager:
     ✔ Basic implementation @done(25-08-11 12:24)
