@@ -4,12 +4,8 @@
     "target": "ES2022",
     "useDefineForClassFields": true,
     "module": "ES2022",
-    "lib": ["ES2019", "DOM"],
+    "lib": ["ES2015", "DOM"],
     "skipLibCheck": true,
-    "paths": {
-      "react": ["./node_modules/preact/compat/"],
-      "react-dom": ["./node_modules/preact/compat/"]
-    },
     "types": ["vitest/importMeta"],
 
     /* Bundler mode */
@@ -17,8 +13,7 @@
     "allowImportingTsExtensions": false,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
-    "noEmit": false,
-    "outDir": "./dist",
+    "noEmit": true,
 
     /* Linting */
     "strict": true,

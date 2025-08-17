@@ -1,5 +1,5 @@
 import type { Empty, Kind, Schema } from "./common";
-import { KIND_SCALAR, NotImplementedError, VALUE_KEEP, VALUE_UNSET } from "./common";
+import { InvalidMemberError, KIND_SCALAR, VALUE_KEEP, VALUE_UNSET } from "./common";
 
 export type Scalar<T> = Schema<T, unknown, Empty, Empty>;
 
@@ -8,6 +8,7 @@ export function scalar<T>(
   compare: (a: T, b: T) => boolean = Object.is,
 ): Scalar<T> {
   return {
+    __proto__: null,
     compute(_entry, value) {
       if (value === VALUE_UNSET) {
         return defaultValue;
@@ -24,13 +25,13 @@ export function scalar<T>(
       entry.invalidate();
       return value;
     },
-    getMember(_key: never): never {
-      throw new NotImplementedError();
+    getMember(): never {
+      throw new InvalidMemberError();
     },
     get kind(): Kind {
       return KIND_SCALAR;
     },
-    mutations(_entry) {
+    mutations() {
       return {};
     },
     hasValue(_entry, value) {

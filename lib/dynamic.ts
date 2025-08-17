@@ -23,7 +23,7 @@ export function dynamic<TParent extends Record<any, any> | unknown[], TKey exten
   key: TKey,
 ): DynamicMembers<TParent>[TKey] {
   return narrowing<TParent[TKey], TParent, DynamicMembers<TParent[TKey]>>({
-    compute(entry, _value) {
+    compute(entry) {
       return entry.parent.get()[key];
     },
     change(entry, value) {

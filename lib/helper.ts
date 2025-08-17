@@ -1,8 +1,8 @@
 import { type ArraySchema, array } from "./array";
-import { type Empty, type Entry, isSchema, type Schema } from "./common";
+import { type Entry, isSchema, type Schema } from "./common";
 import { type Computed, computed } from "./computed";
 import { convert } from "./convert";
-import { type ObjectSchema, object } from "./object";
+import { mapObject, type ObjectSchema, object } from "./object";
 import { type Scalar, scalar } from "./scalar";
 import { sync } from "./sync";
 
@@ -25,7 +25,7 @@ export type SchemaOf<T> =
   [T] extends [Map<any, any>] ? never:
   [T] extends [Set<any>] ? never :
   [T] extends [Record<any, any>] ? ObjectSchema<{
-    [K in keyof T]: IsWritable<T, K> extends true ? SchemaOf<T[K]> : Computed<T[K], T, Empty>
+    [K in keyof T]: IsWritable<T, K> extends true ? SchemaOf<T[K]> : Computed<T[K], T>
   }> :
   never;
 
@@ -41,18 +41,16 @@ export function schema(defaultValue: unknown): Schema {
         return array(scalar(defaultValue[0]));
       } else {
         return object(
-          Object.fromEntries(
-            Object.entries(defaultValue).map<[string, Schema]>(([key, value]) => {
-              const { get, set } = Object.getOwnPropertyDescriptor(defaultValue, key) ?? {};
-              if (get && set) {
-                return [key, sync(get.bind(defaultValue), set.bind(defaultValue))];
-              } else if (get) {
-                return [key, computed(Function.call.bind(get))];
-              } else {
-                return [key, schema<unknown>(value)];
-              }
-            }),
-          ),
+          mapObject(defaultValue as Record<string, unknown>, (value, key) => {
+            const { get, set } = Object.getOwnPropertyDescriptor(defaultValue, key) || {};
+            if (get && set) {
+              return sync(get.bind(defaultValue), set.bind(defaultValue));
+            } else if (get) {
+              return computed(Function.call.bind(get));
+            } else {
+              return schema<unknown>(value);
+            }
+          }),
         );
       }
     default:
@@ -86,7 +84,7 @@ export function formField<
         entry.set(value as T);
       }
     },
-    defaultValue: String(entry.get()),
+    defaultValue: String(entry.default),
   };
 }
 
@@ -109,7 +107,7 @@ export function formCheckbox<TMethod extends MethodProp | Lowercase<MethodProp>>
       }
       entry.set(target.checked);
     },
-    defaultChecked: entry.get(),
+    defaultChecked: entry.default,
     type: "checkbox",
   };
 }
@@ -136,7 +134,7 @@ export function formRadio<K extends string, TMethod extends MethodProp | Lowerca
         entry.set(option);
       }
     },
-    defaultChecked: entry.get() === option,
+    defaultChecked: entry.default === option,
     value: option,
     type: "radio",
   };

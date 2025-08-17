@@ -1,5 +1,5 @@
 import type { Empty, Schema } from "./common";
-import { NotImplementedError, narrowing, VALUE_KEEP } from "./common";
+import { InvalidMemberError, narrowing, VALUE_KEEP } from "./common";
 
 type ConvertSchema<TIn, TOut> = Schema<TOut, TIn, Empty, Empty>;
 
@@ -8,15 +8,15 @@ export function convert<TIn, TOut>(
   setter: (value: TOut) => TIn,
 ): ConvertSchema<TIn, TOut> {
   return narrowing({
-    compute(entry, _value) {
+    compute(entry) {
       return getter(entry.parent.get());
     },
     change(entry, value) {
       entry.parent.set(setter(value));
       return VALUE_KEEP;
     },
-    getMember(_key: never): never {
-      throw new NotImplementedError();
+    getMember(): never {
+      throw new InvalidMemberError();
     },
   });
 }

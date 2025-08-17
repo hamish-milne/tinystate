@@ -1,5 +1,11 @@
 import type { Kind } from "./common";
-import { KIND_SCALAR, NotImplementedError, VALUE_KEEP, VALUE_UNSET } from "./common";
+import {
+  InvalidMemberError,
+  KIND_SCALAR,
+  NotImplementedError,
+  VALUE_KEEP,
+  VALUE_UNSET,
+} from "./common";
 import type { Scalar } from "./scalar";
 
 export function sync<T>(
@@ -8,7 +14,8 @@ export function sync<T>(
   compare: (a: T, b: T) => boolean = Object.is,
 ): Scalar<T> {
   return {
-    compute(_entry) {
+    __proto__: null,
+    compute() {
       return getter();
     },
     computeDefault() {
@@ -22,19 +29,19 @@ export function sync<T>(
       entry.invalidate();
       return value;
     },
-    getMember(_key: never): never {
-      throw new NotImplementedError();
+    getMember(): never {
+      throw new InvalidMemberError();
     },
     get kind(): Kind {
       return KIND_SCALAR;
     },
-    mutations(_entry) {
+    mutations() {
       return {};
     },
-    hasValue(_entry, _value) {
+    hasValue() {
       return false; // Sync schemas do not store values directly
     },
-    unset(_entry) {
+    unset() {
       // Sync schemas do not support unset, as they are derived from a getter
     },
   };

@@ -1,13 +1,12 @@
-import type { AnyMembers, Empty, Schema } from "./common";
-import { narrowing, VALUE_KEEP, VALUE_UNSET } from "./common";
+import type { Empty, Schema } from "./common";
+import { InvalidMemberError, narrowing, VALUE_KEEP, VALUE_UNSET } from "./common";
 
-export type Computed<T, TParent, TMembers extends AnyMembers> = Schema<T, TParent, TMembers, Empty>;
+export type Computed<T, TParent> = Schema<T, TParent, Empty, Empty>;
 
-export function computed<T, TParent, TMembers extends AnyMembers>(
+export function computed<T, TParent>(
   compute: (value: TParent) => T,
   compare: (a: T, b: T) => boolean = Object.is,
-  members: TMembers = {} as TMembers,
-): Computed<T, TParent, TMembers> {
+): Computed<T, TParent> {
   return narrowing({
     compute(entry, value) {
       const newValue = compute(entry.parent.get());
@@ -19,8 +18,8 @@ export function computed<T, TParent, TMembers extends AnyMembers>(
     change(_entry, _value) {
       return VALUE_KEEP; // Computed values are not directly changeable
     },
-    getMember<K extends keyof TMembers>(key: K) {
-      return members[key];
+    getMember() {
+      throw new InvalidMemberError();
     },
   });
 }

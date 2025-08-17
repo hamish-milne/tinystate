@@ -16,21 +16,19 @@ export function extend<
   schema: T,
   members?: TMembers | (<K extends keyof TMembers>(key: K) => TMembers[K]),
   mutations?: TMutations | ((entry: EntryOf<T>) => TMutations),
-): ExtendSchema<T, TMembers, TMutations> {
-  return Object.setPrototypeOf(
-    {
-      ...(members
-        ? {
-            getMember:
-              typeof members === "function"
-                ? members
-                : <K extends keyof TMembers>(key: K): TMembers[K] => members[key],
-          }
-        : null),
-      ...(mutations
-        ? { mutations: typeof mutations === "function" ? mutations : () => mutations }
-        : null),
-    },
-    schema,
-  );
+) {
+  return {
+    __proto__: schema,
+    ...(members
+      ? {
+          getMember:
+            typeof members === "function"
+              ? members
+              : <K extends keyof TMembers>(key: K): TMembers[K] => members[key],
+        }
+      : null),
+    ...(mutations
+      ? { mutations: typeof mutations === "function" ? mutations : () => mutations }
+      : null),
+  } as ExtendSchema<T, TMembers, TMutations>;
 }

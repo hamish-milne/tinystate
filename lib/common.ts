@@ -32,6 +32,12 @@ export class NoParentError extends Error {
   }
 }
 
+export class InvalidMemberError extends Error {
+  constructor() {
+    super("The key provided is not a valid member of this schema");
+  }
+}
+
 export type Empty = { [k: string]: never };
 
 export const KIND_SCALAR = Symbol("scalar");
@@ -53,6 +59,7 @@ export interface Schema<
   TMembers extends AnyMembers = any,
   TMutations extends AnyMutations = any,
 > {
+  readonly __proto__?: unknown; // To allow setting the prototype in initializers
   compute(
     entry: Entry<T, TParent, TMembers, TMutations>,
     value: T | typeof VALUE_UNSET,
@@ -116,7 +123,7 @@ const entryProxy: ProxyHandler<Entry> = {
       return target.mutations[p];
     } else {
       // biome-ignore lint/suspicious/noGlobalIsNan: we're deliberately coercing to number
-      return target.member(isNaN(p as unknown as number) ? p : Number(p));
+      return target.member(isNaN(p as any) ? p : Number(p));
     }
   },
 };
@@ -136,31 +143,41 @@ export type ProxyOf<T> = T extends Schema<any, any, infer C, infer D>
   : never;
 
 class EntryImpl<
-  T = any,
-  TParent = any,
-  TMembers extends AnyMembers = any,
-  TMutations extends AnyMutations = any,
-> {
-  private readonly _schema: Schema<T, TParent, TMembers, TMutations>;
-  private _value: T | typeof VALUE_UNSET = VALUE_UNSET;
-  private _previous: T | typeof VALUE_UNSET = VALUE_UNSET;
-  private readonly _listeners = new Set<Listener<T, TParent, TMembers, TMutations>>();
-  private readonly _parent: EntryImpl<TParent> | undefined;
-  private readonly _members = new Map<string, ReturnType<typeof Proxy.revocable>>();
-  private readonly _manager: Manager;
-  private _mutations: TMutations | undefined;
-  private _isComputing: boolean = false;
-  private _default: T | typeof VALUE_UNSET = VALUE_UNSET;
+    T = any,
+    TParent = any,
+    TMembers extends AnyMembers = any,
+    TMutations extends AnyMutations = any,
+  >
+  extends null
+  implements Entry<T, TParent, TMembers, TMutations>
+{
+  private declare readonly _schema: Schema<T, TParent, TMembers, TMutations>;
+  private declare readonly _listeners: Set<Listener<T, TParent, TMembers, TMutations>>;
+  private declare readonly _parent: EntryImpl<TParent> | undefined;
+  private declare readonly _members: Map<string, ReturnType<typeof Proxy.revocable>>;
+  private declare readonly _manager: Manager;
+  private declare _mutations: TMutations | undefined;
+  private declare _value: T | typeof VALUE_UNSET;
+  private declare _previous: T | typeof VALUE_UNSET;
+  private declare _isComputing: boolean;
+  private declare _default: T | typeof VALUE_UNSET;
 
   constructor(schema: Schema<T, TParent, TMembers, TMutations>, parent: EntryImpl | Manager) {
-    this._schema = schema;
-    if (parent instanceof EntryImpl) {
-      this._parent = parent;
-      this._manager = parent._manager;
-    } else {
-      this._manager = parent;
-      // If parent is a manager, this entry has no parent
-    }
+    // @ts-expect-error
+    return {
+      // @ts-expect-error
+      __proto__: EntryImpl.prototype,
+      _schema: schema,
+      _listeners: new Set(),
+      _parent: parent instanceof EntryImpl ? parent : undefined,
+      _members: new Map(),
+      _manager: parent instanceof Manager ? parent : parent._manager,
+      _mutations: undefined,
+      _value: VALUE_UNSET,
+      _previous: VALUE_UNSET,
+      _isComputing: false,
+      _default: VALUE_UNSET,
+    };
   }
 
   get parent() {
@@ -230,7 +247,7 @@ class EntryImpl<
     if (kind === KIND_WIDENING) {
       this._value = VALUE_UNSET;
     } else {
-      if (this._manager.scheduleRecompute(this)) {
+      if (this._manager._scheduleRecompute(this)) {
         for (const [_, member] of this.members()) {
           member.invalidate();
         }
@@ -238,7 +255,7 @@ class EntryImpl<
     }
     if (kind !== KIND_NARROWING) {
       this._parent?.invalidate();
-      if (this._manager.scheduleNotify(this)) {
+      if (this._manager._scheduleNotify(this)) {
         for (const [_, member] of this.members()) {
           if (member.kind === KIND_NARROWING) {
             member.invalidate();
@@ -250,7 +267,7 @@ class EntryImpl<
 
   private _checkDelete() {
     if (this.isEmpty()) {
-      this._manager.scheduleDestroy(this);
+      this._manager._scheduleDestroy(this);
     }
   }
 
@@ -292,7 +309,7 @@ class EntryImpl<
     const newValue = this._schema.compute(this, this._value);
     if (newValue !== VALUE_KEEP) {
       this._value = newValue;
-      this._manager.scheduleNotify(this);
+      this._manager._scheduleNotify(this);
     }
   }
 
@@ -326,7 +343,7 @@ class EntryImpl<
   }
 
   get mutations(): TMutations {
-    this._mutations ??= Object.freeze(this._schema.mutations(this));
+    this._mutations ||= Object.freeze(this._schema.mutations(this));
     return this._mutations;
   }
 }
@@ -337,38 +354,50 @@ export function isEntry(value: unknown): value is Entry {
 
 type Scheduler = (callback: () => void) => number | undefined;
 
-class Manager {
-  #timeoutId: number | undefined;
-  #updateIteration: number = 0;
-  readonly #updateIterationMax: number = 3; // Maximum iterations to prevent infinite loops
-  readonly #update: () => void;
-  readonly #scheduler: Scheduler;
-  readonly #toNotify = new Set<EntryImpl>();
-  readonly #toRecompute = new Set<EntryImpl>();
-  readonly #toDestroy = new Set<EntryImpl>();
+class Manager extends null {
+  private declare readonly _updateIterationMax: number; // Maximum iterations to prevent infinite loops
+  private declare readonly _scheduler: Scheduler;
+  private declare readonly _toNotify: Set<EntryImpl>;
+  private declare readonly _toRecompute: Set<EntryImpl>;
+  private declare readonly _toDestroy: Set<EntryImpl>;
+  private declare _timeoutId: number | undefined;
+  private declare _updateIteration: number;
+  private declare _update: (() => void) | undefined;
 
   constructor(scheduler: Scheduler) {
-    this.#update = this.update.bind(this);
-    this.#scheduler = scheduler;
+    // @ts-expect-error
+    return {
+      // @ts-expect-error
+      __proto__: Manager.prototype,
+      _updateIterationMax: 3,
+      _scheduler: scheduler,
+      _toNotify: new Set(),
+      _toRecompute: new Set(),
+      _toDestroy: new Set(),
+      _timeoutId: undefined,
+      _updateIteration: 0,
+      _update: undefined,
+    };
   }
 
-  private scheduleUpdate() {
-    if (this.#timeoutId === undefined) {
-      this.#updateIteration++;
-      if (this.#updateIteration > this.#updateIterationMax) {
+  private _scheduleUpdate() {
+    if (this._timeoutId === undefined) {
+      this._updateIteration++;
+      if (this._updateIteration > this._updateIterationMax) {
         throw new Error("Too many iterations in state manager timeout, possible infinite loop");
       }
-      this.#timeoutId = this.#scheduler(this.#update);
+      this._update ||= this._doUpdate.bind(this);
+      this._timeoutId = this._scheduler(this._update);
     }
   }
 
-  private update() {
-    this.#timeoutId = undefined;
+  private _doUpdate() {
+    this._timeoutId = undefined;
 
     for (const [set, method] of [
-      [this.#toRecompute, "recompute"],
-      [this.#toNotify, "notify"],
-      [this.#toDestroy, "garbageCollect"],
+      [this._toRecompute, "recompute"],
+      [this._toNotify, "notify"],
+      [this._toDestroy, "garbageCollect"],
     ] as const) {
       const setCopy = Array.from(set);
       set.clear();
@@ -382,28 +411,28 @@ class Manager {
     }
 
     // Only reset the iteration count if another update was not scheduled
-    if (this.#timeoutId === undefined) {
-      this.#updateIteration = 0;
+    if (this._timeoutId === undefined) {
+      this._updateIteration = 0;
     }
   }
 
-  private schedule(entry: EntryImpl, set: Set<EntryImpl>): boolean {
+  private _schedule(entry: EntryImpl, set: Set<EntryImpl>): boolean {
     if (set.has(entry)) {
       return false; // Already scheduled
     }
     set.add(entry);
-    this.scheduleUpdate();
+    this._scheduleUpdate();
     return true;
   }
 
-  scheduleNotify(entry: EntryImpl): boolean {
-    return this.schedule(entry, this.#toNotify);
+  _scheduleNotify(entry: EntryImpl): boolean {
+    return this._schedule(entry, this._toNotify);
   }
-  scheduleRecompute(entry: EntryImpl): boolean {
-    return this.schedule(entry, this.#toRecompute);
+  _scheduleRecompute(entry: EntryImpl): boolean {
+    return this._schedule(entry, this._toRecompute);
   }
-  scheduleDestroy(entry: EntryImpl): void {
-    this.schedule(entry, this.#toDestroy);
+  _scheduleDestroy(entry: EntryImpl): void {
+    this._schedule(entry, this._toDestroy);
   }
 }
 
@@ -433,10 +462,7 @@ const NARROWING_PROTO = {
 };
 
 export function narrowing<T, TParent, TMembers extends AnyMembers>(
-  schema: Omit<
-    Schema<T, TParent, TMembers, Empty>,
-    "computeDefault" | "kind" | "mutations" | "hasValue" | "unset"
-  >,
+  schema: Pick<Schema<T, TParent, TMembers, Empty>, "compute" | "change" | "getMember">,
 ) {
-  return Object.setPrototypeOf(schema, NARROWING_PROTO) as Schema<T, TParent, TMembers, Empty>;
+  return { __proto__: NARROWING_PROTO, ...schema } as Schema<T, TParent, TMembers, Empty>;
 }

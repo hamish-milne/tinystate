@@ -4,7 +4,7 @@ import { KIND_WIDENING, ReadonlyError, VALUE_KEEP } from "./common";
 class ReadonlyMapImpl<K, V> extends Map<K, V> implements ReadonlyMap<K, V> {
   constructor(entries?: readonly (readonly [K, V])[] | Iterable<readonly [K, V]> | null) {
     super();
-    for (const [key, value] of entries ?? []) {
+    for (const [key, value] of entries || []) {
       super.set(key, value);
     }
     Object.freeze(this);
@@ -36,6 +36,7 @@ export type MapSchema<K extends string, V extends Schema> = Schema<
 
 export function map<K extends string, V extends Schema>(valueSchema: V): MapSchema<K, V> {
   return {
+    __proto__: null,
     compute(entry) {
       const map = new Map<K, ValueOf<V>>();
       for (const [key, member] of entry.members()) {
@@ -81,7 +82,7 @@ export function map<K extends string, V extends Schema>(valueSchema: V): MapSche
     get kind(): Kind {
       return KIND_WIDENING;
     },
-    hasValue(entry, _value) {
+    hasValue(entry) {
       for (const [_key, member] of entry.members()) {
         if (member.hasValue()) {
           return true;

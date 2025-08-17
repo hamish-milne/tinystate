@@ -12,11 +12,25 @@ export type ObjectSchema<TMembers extends AnyMembers> = Schema<
   Empty
 >;
 
+export function mapObject<T extends {}, TOut>(
+  obj: T,
+  map: (this: void, value: T[keyof T], key: keyof T, obj: T) => TOut,
+  filter?: (this: void, value: T[keyof T], key: keyof T, obj: T) => boolean,
+) {
+  const result = { __proto__: null } as { [K in keyof T]: TOut };
+  for (const key of Object.keys(obj) as (keyof T)[]) {
+    if (filter && !filter(obj[key], key, obj)) {
+      continue;
+    }
+    result[key] = map(obj[key], key, obj);
+  }
+  return result;
+}
+
 export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSchema<TMembers> {
-  const memberEntries = Object.entries(members).filter(
-    ([_key, member]) => member.kind !== KIND_NARROWING,
-  );
+  const keys = Object.keys(members) as (keyof TMembers)[];
   return {
+    __proto__: null,
     compute(entry) {
       const value = { ...entry.default };
       for (const [key, member] of entry.members()) {
@@ -29,12 +43,20 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
     },
     computeDefault() {
       return Object.freeze(
-        Object.fromEntries(memberEntries.map(([key, member]) => [key, member.computeDefault()])),
-      ) as ObjectValue<TMembers>;
+        mapObject(
+          members,
+          (member) => member.computeDefault(),
+          (member) => member.kind !== KIND_NARROWING,
+        ),
+      );
     },
     change(entry, value): typeof VALUE_KEEP {
-      for (const [key] of memberEntries) {
-        entry.member(key).set(value[key]);
+      for (const key of keys) {
+        const member = entry.member(key);
+        if (member.kind === KIND_NARROWING) {
+          continue; // Skip computed members
+        }
+        member.set(value[key]);
       }
       // We allow the members to call invalidate themselves, so we don't need to do anything here
       return VALUE_KEEP;

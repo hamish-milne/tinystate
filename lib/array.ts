@@ -1,5 +1,5 @@
 import type { Kind, Schema, ValueOf } from "./common";
-import { KIND_WIDENING, VALUE_KEEP } from "./common";
+import { InvalidMemberError, KIND_WIDENING, VALUE_KEEP } from "./common";
 import { type Scalar, scalar } from "./scalar";
 
 type ArrayValue<T extends Schema> = readonly ValueOf<T>[];
@@ -26,6 +26,7 @@ export type ArraySchema<T extends Schema> = Schema<
 
 export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
   return {
+    __proto__: null,
     get kind(): Kind {
       return KIND_WIDENING;
     },
@@ -58,7 +59,7 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
       if (typeof key === "number" && key >= 0) {
         return itemSchema as ArrayMembers<T>[K];
       }
-      throw new Error(`Invalid key for ArraySchema: ${key}`);
+      throw new InvalidMemberError();
     },
     mutations(entry) {
       return {
@@ -71,7 +72,7 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
         clear: () => entry.member("length").set(0),
       };
     },
-    hasValue(entry, _value) {
+    hasValue(entry) {
       return entry.member("length").get() > 0;
     },
     unset(entry) {

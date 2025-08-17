@@ -5,7 +5,7 @@ import { scalar } from "./scalar";
 class ReadonlySetImpl<T> extends Set<T> implements ReadonlySet<T> {
   constructor(values?: readonly T[] | Iterable<T> | null) {
     super();
-    for (const value of values ?? []) {
+    for (const value of values || []) {
       super.add(value);
     }
     Object.freeze(this);
@@ -42,6 +42,7 @@ export type SetSchema<K extends string> = Schema<
 
 export function set<K extends string>(): SetSchema<K> {
   return {
+    __proto__: null,
     compute(entry) {
       const set = new Set<K>();
       for (const [key, member] of entry.members()) {
@@ -86,7 +87,7 @@ export function set<K extends string>(): SetSchema<K> {
     get kind(): Kind {
       return KIND_WIDENING;
     },
-    hasValue(entry, _value) {
+    hasValue(entry) {
       for (const [_key, member] of entry.members()) {
         if (member.hasValue()) {
           return true;
