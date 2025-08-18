@@ -37,6 +37,9 @@ export function dynamic<TParent extends Record<any, any> | unknown[], TKey exten
       return UNCHANGED;
     },
     getMember: dynamic as any,
+    isMemberPermanent() {
+      return false; // Dynamic members are not permanent
+    },
   }) as any;
 }
 

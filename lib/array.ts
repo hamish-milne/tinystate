@@ -61,6 +61,9 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
       }
       throw new InvalidMemberError();
     },
+    isMemberPermanent(key) {
+      return key === "length";
+    },
     mutations(entry) {
       return {
         push: (value: ValueOf<T>) => {

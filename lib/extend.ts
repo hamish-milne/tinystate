@@ -25,6 +25,9 @@ export function extend<
             typeof members === "function"
               ? members
               : <K extends keyof TMembers>(key: K): TMembers[K] => members[key],
+          isMemberPermanent(_key) {
+            return true;
+          },
         }
       : null),
     ...(mutations

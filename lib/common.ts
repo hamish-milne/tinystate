@@ -72,6 +72,7 @@ export interface Schema<
   ): T | typeof UNCHANGED;
   getMember<K extends keyof TMembers>(key: K): TMembers[K];
   getMember(key: keyof TMembers): TMembers[keyof TMembers];
+  isMemberPermanent(key: keyof TMembers): boolean;
   get kind(): Kind;
   mutations(entry: Entry<T, TParent, TMembers, TMutations>): TMutations;
   hasValue(entry: Entry<T, TParent, TMembers, TMutations>, value: T | typeof UNCHANGED): boolean;
@@ -132,7 +133,16 @@ const entryProxy: ProxyHandler<Entry> = {
     } else if (p in target.mutations) {
       return target.mutations[p];
     } else {
+      TEST: {
+        try {
+          // biome-ignore lint/suspicious/noGlobalIsNan: we're deliberately coercing to number
+          return target.member(isNaN(p as any) ? p : Number(p));
+        } catch {
+          return undefined;
+        }
+      }
       // biome-ignore lint/suspicious/noGlobalIsNan: we're deliberately coercing to number
+      // biome-ignore lint/correctness/noUnreachable: the TEST block above will be removed
       return target.member(isNaN(p as any) ? p : Number(p));
     }
   },
@@ -282,12 +292,10 @@ class EntryImpl<
   }
 
   garbageCollect(): void {
-    if (this._members) {
-      for (const [key, { revoke, proxy: member }] of this._members.entries()) {
-        if ((member as Entry).isEmpty()) {
-          this._members.delete(String(key));
-          revoke();
-        }
+    for (const [key, { revoke, proxy: member }] of this._members.entries()) {
+      if (!this._schema.isMemberPermanent(key) && member.isEmpty()) {
+        this._members.delete(String(key));
+        revoke();
       }
     }
     if (this.isEmpty()) {
@@ -305,13 +313,11 @@ class EntryImpl<
   }
 
   notify(): void {
-    if (this._listeners) {
-      const previous = this._previous;
-      const value = this.get();
-      this._previous = value;
-      for (const listener of this._listeners) {
-        listener(value, previous, this);
-      }
+    const previous = this._previous;
+    const value = this.get();
+    this._previous = value;
+    for (const listener of this._listeners) {
+      listener(value, previous, this);
     }
   }
 
@@ -460,7 +466,7 @@ export function createRoot<T extends Schema>(
   return new Proxy(new EntryImpl(schema, new Manager(scheduler)), entryProxy) as ProxyOf<T>;
 }
 
-const NARROWING_PROTO = {
+const NARROWING_PROTO: Omit<Schema, "compute" | "change"> = {
   computeDefault() {
     throw new NotImplementedError();
   },
@@ -476,10 +482,37 @@ const NARROWING_PROTO = {
   unset() {
     // Computed values do not support unset, as they are derived from their parent
   },
+  getMember() {
+    throw new InvalidMemberError();
+  },
+  isMemberPermanent() {
+    throw new InvalidMemberError();
+  },
 };
 
 export function narrowing<T, TParent, TMembers extends AnyMembers>(
-  schema: Pick<Schema<T, TParent, TMembers, Empty>, "compute" | "change" | "getMember">,
+  schema: Pick<Schema<T, TParent, TMembers, Empty>, "compute" | "change"> &
+    Partial<Schema<T, TParent, TMembers, Empty>>,
 ) {
   return { __proto__: NARROWING_PROTO, ...schema } as Schema<T, TParent, TMembers, Empty>;
+}
+
+/* v8 ignore start -- @preserve */
+TEST: if (import.meta.vitest) {
+  const { test, expect, vi } = import.meta.vitest;
+  const { createRoot } = await import("./");
+  const { map, scalar } = await import("./");
+  vi.useFakeTimers();
+
+  test("garbageCollect removes unset members", () => {
+    const schema = map(scalar(0));
+    const root = createRoot(schema);
+    const entry1 = root.member("a");
+    entry1.set(1);
+    vi.runAllTimers();
+    expect(root.member("a")).toBe(entry1);
+    entry1.unset();
+    vi.runAllTimers();
+    expect(root.member("a") === entry1).toBe(false);
+  });
 }

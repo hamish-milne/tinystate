@@ -1,5 +1,5 @@
 import type { Empty, Schema } from "./common";
-import { InvalidMemberError, MEMBERS_UNCHANGED, narrowing, UNCHANGED } from "./common";
+import { MEMBERS_UNCHANGED, narrowing, UNCHANGED } from "./common";
 
 export type Computed<T, TParent> = Schema<T, TParent, Empty, Empty>;
 
@@ -17,9 +17,6 @@ export function computed<T, TParent>(
     },
     change(_entry, _value) {
       return UNCHANGED; // Computed values are not directly changeable
-    },
-    getMember() {
-      throw new InvalidMemberError();
     },
   });
 }

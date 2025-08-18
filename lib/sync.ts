@@ -26,6 +26,9 @@ export function sync<T>(
     getMember(): never {
       throw new InvalidMemberError();
     },
+    isMemberPermanent() {
+      throw new InvalidMemberError();
+    },
     get kind(): Kind {
       return KIND_SCALAR;
     },

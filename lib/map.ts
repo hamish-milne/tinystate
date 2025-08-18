@@ -68,6 +68,9 @@ export function map<K extends string, V extends Schema>(valueSchema: V): MapSche
     getMember(_key: K) {
       return valueSchema;
     },
+    isMemberPermanent() {
+      return false;
+    },
     mutations(entry) {
       return {
         set: (key: K, value: V) => entry.member(key).set(value),

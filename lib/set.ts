@@ -73,6 +73,9 @@ export function set<K extends string>(): SetSchema<K> {
     getMember(_key: K) {
       return SET_MEMBER;
     },
+    isMemberPermanent() {
+      return false;
+    },
     mutations(entry) {
       return {
         add: (key: K) => entry.member(key).set(true),

@@ -8,7 +8,9 @@ Core features:
     ✔ Combine VALUE_UNSET and VALUE_KEEP @done(25-08-18 14:47)
     ✔ Iterators for dependent/dependencies/all members @done(25-08-18 14:43)
     ✔ Getter flags: include defaults, include dependants @done(25-08-18 14:43)
-    ☐ Flag for if entry is eligible for deletion
+    ✔ Flag for if entry is eligible for deletion @done(25-08-18 17:09)
+    ☐ Rework Entry revocation
+    ☐ Make Entry Proxy opt-in
   Manager:
     ✔ Basic implementation @done(25-08-11 12:24)
     ☐ Unit tests

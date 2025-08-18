@@ -62,6 +62,9 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
     getMember<K extends keyof TMembers>(key: K) {
       return members[key];
     },
+    isMemberPermanent() {
+      return true;
+    },
     mutations(_entry) {
       return {};
     },
