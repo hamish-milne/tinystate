@@ -1,5 +1,5 @@
 import type { AnyMembers, Empty, Kind, Schema } from "./common";
-import { KIND_NARROWING, KIND_WIDENING, VALUE_KEEP } from "./common";
+import { KIND_NARROWING, KIND_WIDENING, MEMBERS_UNCHANGED, VALUE_KEEP } from "./common";
 
 type ObjectValue<TMembers extends AnyMembers> = {
   [K in keyof TMembers]: TMembers[K] extends Schema<infer V, any> ? V : never;
@@ -31,12 +31,10 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
   const keys = Object.keys(members) as (keyof TMembers)[];
   return {
     __proto__: null,
-    compute(entry) {
-      const value = { ...entry.default };
-      for (const [key, member] of entry.members()) {
-        if (member.kind === KIND_NARROWING) {
-          continue; // Skip computed members
-        }
+    compute(entry, _value, flags) {
+      const value =
+        flags & MEMBERS_UNCHANGED ? { ...entry.default } : ({} as ObjectValue<TMembers>);
+      for (const [key, member] of entry.members(flags)) {
         value[key] = member.get();
       }
       return value;
@@ -72,9 +70,6 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
     },
     hasValue(entry, _value) {
       for (const [_key, member] of entry.members()) {
-        if (member.kind === KIND_NARROWING) {
-          continue; // Skip computed members
-        }
         if (member.hasValue()) {
           return true;
         }
@@ -83,9 +78,6 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
     },
     unset(entry) {
       for (const [_key, member] of entry.members()) {
-        if (member.kind === KIND_NARROWING) {
-          continue; // Skip computed members
-        }
         member.unset();
       }
     },
@@ -95,7 +87,7 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  const { createRoot, object, scalar } = await import("./");
+  const { createRoot, object, scalar, MEMBERS_ALL } = await import("./");
   vi.useFakeTimers();
 
   test("get/set round-trip", () => {
@@ -104,7 +96,7 @@ TEST: if (import.meta.vitest) {
       b: scalar(2),
     });
     const entry = createRoot(schema);
-    expect(entry.get()).toEqual({ a: 1, b: 2 });
+    expect(entry.get(MEMBERS_ALL)).toEqual({ a: 1, b: 2 });
     entry.set({ a: 3, b: 4 });
     expect(entry.get()).toEqual({ a: 3, b: 4 });
     entry.set({ a: 1, b: 2 });

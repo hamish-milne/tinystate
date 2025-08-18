@@ -63,6 +63,7 @@ export interface Schema<
   compute(
     entry: Entry<T, TParent, TMembers, TMutations>,
     value: T | typeof VALUE_UNSET,
+    flags: MembersFlags,
   ): T | typeof VALUE_KEEP;
   computeDefault(): T;
   change(
@@ -92,13 +93,23 @@ export function isSchema<T = any>(value: unknown): value is Schema<T> {
   }
 }
 
+export const MEMBERS_DEFAULT = 0;
+export const MEMBERS_DEPENDANTS = 1;
+export const MEMBERS_UNCHANGED = 2;
+export const MEMBERS_ALL = 3;
+export type MembersFlags =
+  | typeof MEMBERS_DEFAULT
+  | typeof MEMBERS_DEPENDANTS
+  | typeof MEMBERS_UNCHANGED
+  | typeof MEMBERS_ALL;
+
 export interface Entry<
   T = any,
   TParent = any,
   TMembers extends AnyMembers = any,
   TMutations extends AnyMutations = any,
 > {
-  get(): T;
+  get(flags?: MembersFlags): T;
   set(value: T): void;
   unset(): void;
   invalidate(): void;
@@ -107,7 +118,7 @@ export interface Entry<
   subscribe(listener: Listener<T, TParent, TMembers, TMutations>): Cleanup;
   isEmpty(): boolean;
   hasValue(): boolean;
-  members(): IterableIterator<MemberPairs<TMembers>, undefined>;
+  members(flags?: MembersFlags): IterableIterator<MemberPairs<TMembers>, undefined>;
   member<K extends keyof TMembers>(key: K): EntryOf<TMembers[K]>;
   get mutations(): TMutations;
   get parent(): Entry<TParent>;
@@ -154,7 +165,7 @@ class EntryImpl<
   private declare readonly _schema: Schema<T, TParent, TMembers, TMutations>;
   private declare readonly _listeners: Set<Listener<T, TParent, TMembers, TMutations>>;
   private declare readonly _parent: EntryImpl<TParent> | undefined;
-  private declare readonly _members: Map<string, ReturnType<typeof Proxy.revocable>>;
+  private declare readonly _members: Map<string, ReturnType<typeof Proxy.revocable<Entry>>>;
   private declare readonly _manager: Manager;
   private declare _mutations: TMutations | undefined;
   private declare _value: T | typeof VALUE_UNSET;
@@ -194,14 +205,14 @@ class EntryImpl<
     return this._default;
   }
 
-  get(): T {
+  get(flags?: MembersFlags): T {
     if (this._value === VALUE_UNSET) {
       try {
         if (this._isComputing) {
           throw new Error("Recursive compute call detected");
         }
         this._isComputing = true;
-        const newValue = this._schema.compute(this, this._value);
+        const newValue = this._schema.compute(this, this._value, flags ?? MEMBERS_DEFAULT);
         if (newValue === VALUE_KEEP) {
           throw new Error("compute() returned VALUE_KEEP for entry without a value");
         }
@@ -248,7 +259,7 @@ class EntryImpl<
       this._value = VALUE_UNSET;
     } else {
       if (this._manager._scheduleRecompute(this)) {
-        for (const [_, member] of this.members()) {
+        for (const [_, member] of this.members(MEMBERS_ALL)) {
           member.invalidate();
         }
       }
@@ -256,7 +267,7 @@ class EntryImpl<
     if (kind !== KIND_NARROWING) {
       this._parent?.invalidate();
       if (this._manager._scheduleNotify(this)) {
-        for (const [_, member] of this.members()) {
+        for (const [_, member] of this.members(MEMBERS_ALL)) {
           if (member.kind === KIND_NARROWING) {
             member.invalidate();
           }
@@ -306,18 +317,25 @@ class EntryImpl<
   }
 
   recompute(): void {
-    const newValue = this._schema.compute(this, this._value);
+    const newValue = this._schema.compute(this, this._value, MEMBERS_DEFAULT);
     if (newValue !== VALUE_KEEP) {
       this._value = newValue;
       this._manager._scheduleNotify(this);
     }
   }
 
-  members(): IterableIterator<MemberPairs<TMembers>, undefined> {
+  members(
+    flags: MembersFlags = MEMBERS_DEFAULT,
+  ): IterableIterator<MemberPairs<TMembers>, undefined> {
     const inner = this._members.entries();
     return {
       next() {
-        const result = inner.next();
+        let result = inner.next();
+        if ((flags & MEMBERS_DEPENDANTS) === 0) {
+          while (!result.done && result.value[1].proxy.kind === KIND_NARROWING) {
+            result = inner.next();
+          }
+        }
         if (result.done) {
           return result;
         }
@@ -439,7 +457,7 @@ class Manager extends null {
 export function createRoot<T extends Schema>(
   schema: T,
   scheduler: Scheduler = (u) => window.setTimeout(u, 0),
-): ProxyOf<T> {
+) {
   return new Proxy(new EntryImpl(schema, new Manager(scheduler)), entryProxy) as ProxyOf<T>;
 }
 
