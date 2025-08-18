@@ -1,5 +1,5 @@
 import type { Empty, Schema, ValueOf } from "./common";
-import { narrowing, VALUE_KEEP } from "./common";
+import { narrowing, UNCHANGED } from "./common";
 import { extend } from "./extend";
 
 export type DynamicSchema<TParent, TKey extends keyof TParent> = Schema<
@@ -29,12 +29,12 @@ export function dynamic<TParent extends Record<any, any> | unknown[], TKey exten
     change(entry, value) {
       const parent = entry.parent.get();
       if (!parent || typeof parent !== "object") {
-        return VALUE_KEEP; // No change if parent is not an object
+        return UNCHANGED; // No change if parent is not an object
       }
       const copy = (Array.isArray(parent) ? [...parent] : { ...parent }) as TParent;
       copy[key] = value;
       entry.parent.set(copy);
-      return VALUE_KEEP;
+      return UNCHANGED;
     },
     getMember: dynamic as any,
   }) as any;

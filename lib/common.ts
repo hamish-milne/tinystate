@@ -11,8 +11,7 @@ type MemberPairs<T extends AnyMembers> = {
   [K in keyof T]: [K, EntryOf<T[K]>];
 }[keyof T];
 
-export const VALUE_UNSET = Symbol("value unset");
-export const VALUE_KEEP = Symbol("value keep");
+export const UNCHANGED = Symbol("unchanged");
 
 export class NotImplementedError extends Error {
   constructor() {
@@ -48,7 +47,7 @@ export type Kind = typeof KIND_SCALAR | typeof KIND_NARROWING | typeof KIND_WIDE
 export type Listener<T, TParent, TMembers extends AnyMembers, TMutations extends AnyMutations> = (
   this: void,
   value: T,
-  previous: T | typeof VALUE_UNSET,
+  previous: T | typeof UNCHANGED,
   entry: Entry<T, TParent, TMembers, TMutations>,
 ) => void;
 export type Cleanup = (this: void) => void;
@@ -62,20 +61,20 @@ export interface Schema<
   readonly __proto__?: unknown; // To allow setting the prototype in initializers
   compute(
     entry: Entry<T, TParent, TMembers, TMutations>,
-    value: T | typeof VALUE_UNSET,
+    value: T | typeof UNCHANGED,
     flags: MembersFlags,
-  ): T | typeof VALUE_KEEP;
+  ): T | typeof UNCHANGED;
   computeDefault(): T;
   change(
     entry: Entry<T, TParent, TMembers, TMutations>,
     value: T,
-    prev: T | typeof VALUE_UNSET,
-  ): T | typeof VALUE_KEEP;
+    prev: T | typeof UNCHANGED,
+  ): T | typeof UNCHANGED;
   getMember<K extends keyof TMembers>(key: K): TMembers[K];
   getMember(key: keyof TMembers): TMembers[keyof TMembers];
   get kind(): Kind;
   mutations(entry: Entry<T, TParent, TMembers, TMutations>): TMutations;
-  hasValue(entry: Entry<T, TParent, TMembers, TMutations>, value: T | typeof VALUE_UNSET): boolean;
+  hasValue(entry: Entry<T, TParent, TMembers, TMutations>, value: T | typeof UNCHANGED): boolean;
   unset(entry: Entry<T, TParent, TMembers, TMutations>): void;
 }
 
@@ -168,10 +167,10 @@ class EntryImpl<
   private declare readonly _members: Map<string, ReturnType<typeof Proxy.revocable<Entry>>>;
   private declare readonly _manager: Manager;
   private declare _mutations: TMutations | undefined;
-  private declare _value: T | typeof VALUE_UNSET;
-  private declare _previous: T | typeof VALUE_UNSET;
+  private declare _value: T | typeof UNCHANGED;
+  private declare _previous: T | typeof UNCHANGED;
   private declare _isComputing: boolean;
-  private declare _default: T | typeof VALUE_UNSET;
+  private declare _default: T | typeof UNCHANGED;
 
   constructor(schema: Schema<T, TParent, TMembers, TMutations>, parent: EntryImpl | Manager) {
     // @ts-expect-error
@@ -184,10 +183,10 @@ class EntryImpl<
       _members: new Map(),
       _manager: parent instanceof Manager ? parent : parent._manager,
       _mutations: undefined,
-      _value: VALUE_UNSET,
-      _previous: VALUE_UNSET,
+      _value: UNCHANGED,
+      _previous: UNCHANGED,
       _isComputing: false,
-      _default: VALUE_UNSET,
+      _default: UNCHANGED,
     };
   }
 
@@ -199,22 +198,22 @@ class EntryImpl<
   }
 
   get default(): T {
-    if (this._default === VALUE_UNSET) {
+    if (this._default === UNCHANGED) {
       this._default = this._schema.computeDefault();
     }
     return this._default;
   }
 
   get(flags?: MembersFlags): T {
-    if (this._value === VALUE_UNSET) {
+    if (this._value === UNCHANGED) {
       try {
         if (this._isComputing) {
           throw new Error("Recursive compute call detected");
         }
         this._isComputing = true;
         const newValue = this._schema.compute(this, this._value, flags ?? MEMBERS_DEFAULT);
-        if (newValue === VALUE_KEEP) {
-          throw new Error("compute() returned VALUE_KEEP for entry without a value");
+        if (newValue === UNCHANGED) {
+          throw new Error("compute() returned UNCHANGED for entry without a value");
         }
         this._value = newValue;
       } finally {
@@ -238,7 +237,7 @@ class EntryImpl<
 
   set(value: T): void {
     const newValue = this._schema.change(this, value, this._value);
-    if (newValue !== VALUE_KEEP) {
+    if (newValue !== UNCHANGED) {
       this._value = newValue;
       this._checkDelete();
     }
@@ -256,7 +255,7 @@ class EntryImpl<
   invalidate(): void {
     const { kind } = this._schema;
     if (kind === KIND_WIDENING) {
-      this._value = VALUE_UNSET;
+      this._value = UNCHANGED;
     } else {
       if (this._manager._scheduleRecompute(this)) {
         for (const [_, member] of this.members(MEMBERS_ALL)) {
@@ -318,7 +317,7 @@ class EntryImpl<
 
   recompute(): void {
     const newValue = this._schema.compute(this, this._value, MEMBERS_DEFAULT);
-    if (newValue !== VALUE_KEEP) {
+    if (newValue !== UNCHANGED) {
       this._value = newValue;
       this._manager._scheduleNotify(this);
     }

@@ -1,5 +1,5 @@
 import type { Kind, Schema, ValueOf } from "./common";
-import { InvalidMemberError, KIND_WIDENING, VALUE_KEEP } from "./common";
+import { InvalidMemberError, KIND_WIDENING, UNCHANGED } from "./common";
 import { type Scalar, scalar } from "./scalar";
 
 type ArrayValue<T extends Schema> = readonly ValueOf<T>[];
@@ -44,13 +44,13 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
     computeDefault() {
       return ARRAY_EMPTY;
     },
-    change(entry, value): typeof VALUE_KEEP {
+    change(entry, value): typeof UNCHANGED {
       entry.member("length").set(value.length);
       for (let i = 0, l = value.length; i < l; i++) {
         entry.member(i).set(value[i]);
       }
       // We allow the members to call invalidate themselves, so we don't need to do anything here
-      return VALUE_KEEP;
+      return UNCHANGED;
     },
     getMember<K extends number | "length">(key: K) {
       if (key === "length") {

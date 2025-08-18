@@ -1,5 +1,5 @@
 import type { Kind, Schema } from "./common";
-import { KIND_WIDENING, ReadonlyError, VALUE_KEEP } from "./common";
+import { KIND_WIDENING, ReadonlyError, UNCHANGED } from "./common";
 import { scalar } from "./scalar";
 
 class ReadonlySetImpl<T> extends Set<T> implements ReadonlySet<T> {
@@ -68,7 +68,7 @@ export function set<K extends string>(): SetSchema<K> {
         entry.member(key).set(true); // Set the member to true if it exists in the new set
       }
       // We allow the members to call invalidate themselves, so we don't need to do anything here
-      return VALUE_KEEP;
+      return UNCHANGED;
     },
     getMember(_key: K) {
       return SET_MEMBER;

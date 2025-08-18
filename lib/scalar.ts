@@ -1,5 +1,5 @@
 import type { Empty, Kind, Schema } from "./common";
-import { InvalidMemberError, KIND_SCALAR, VALUE_KEEP, VALUE_UNSET } from "./common";
+import { InvalidMemberError, KIND_SCALAR, UNCHANGED } from "./common";
 
 export type Scalar<T> = Schema<T, unknown, Empty, Empty>;
 
@@ -10,17 +10,17 @@ export function scalar<T>(
   return {
     __proto__: null,
     compute(_entry, value) {
-      if (value === VALUE_UNSET) {
+      if (value === UNCHANGED) {
         return defaultValue;
       }
-      return VALUE_KEEP;
+      return UNCHANGED;
     },
     computeDefault() {
       return defaultValue;
     },
     change(entry, value, prev) {
-      if (prev !== VALUE_UNSET && compare(value, prev)) {
-        return VALUE_KEEP;
+      if (prev !== UNCHANGED && compare(value, prev)) {
+        return UNCHANGED;
       }
       entry.invalidate();
       return value;
@@ -35,7 +35,7 @@ export function scalar<T>(
       return {};
     },
     hasValue(_entry, value) {
-      return value !== VALUE_UNSET && !compare(value, defaultValue);
+      return value !== UNCHANGED && !compare(value, defaultValue);
     },
     unset(entry) {
       entry.set(defaultValue);
@@ -46,7 +46,7 @@ export function scalar<T>(
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  const { createRoot, VALUE_UNSET } = await import("./");
+  const { createRoot, UNCHANGED } = await import("./");
   vi.useFakeTimers();
 
   test("get/set round-trip", () => {
@@ -77,7 +77,7 @@ TEST: if (import.meta.vitest) {
     const unsubscribe = entry.subscribe(listener);
     entry.set(100);
     vi.runAllTimers();
-    expect(listener).toHaveBeenCalledWith(100, VALUE_UNSET, entry);
+    expect(listener).toHaveBeenCalledWith(100, UNCHANGED, entry);
     entry.set(100);
     vi.runAllTimers();
     expect(listener).toHaveBeenCalledTimes(1); // No change, no notification

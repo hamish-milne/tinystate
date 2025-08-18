@@ -1,5 +1,5 @@
 import type { AnyMembers, Empty, Kind, Schema } from "./common";
-import { KIND_NARROWING, KIND_WIDENING, MEMBERS_UNCHANGED, VALUE_KEEP } from "./common";
+import { KIND_NARROWING, KIND_WIDENING, MEMBERS_UNCHANGED, UNCHANGED } from "./common";
 
 type ObjectValue<TMembers extends AnyMembers> = {
   [K in keyof TMembers]: TMembers[K] extends Schema<infer V, any> ? V : never;
@@ -48,7 +48,7 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
         ),
       );
     },
-    change(entry, value): typeof VALUE_KEEP {
+    change(entry, value): typeof UNCHANGED {
       for (const key of keys) {
         const member = entry.member(key);
         if (member.kind === KIND_NARROWING) {
@@ -57,7 +57,7 @@ export function object<TMembers extends AnyMembers>(members: TMembers): ObjectSc
         member.set(value[key]);
       }
       // We allow the members to call invalidate themselves, so we don't need to do anything here
-      return VALUE_KEEP;
+      return UNCHANGED;
     },
     getMember<K extends keyof TMembers>(key: K) {
       return members[key];

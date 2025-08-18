@@ -1,11 +1,5 @@
 import type { Empty, Schema } from "./common";
-import {
-  InvalidMemberError,
-  MEMBERS_UNCHANGED,
-  narrowing,
-  VALUE_KEEP,
-  VALUE_UNSET,
-} from "./common";
+import { InvalidMemberError, MEMBERS_UNCHANGED, narrowing, UNCHANGED } from "./common";
 
 export type Computed<T, TParent> = Schema<T, TParent, Empty, Empty>;
 
@@ -16,13 +10,13 @@ export function computed<T, TParent>(
   return narrowing({
     compute(entry, value) {
       const newValue = compute(entry.parent.get(MEMBERS_UNCHANGED));
-      if (value !== VALUE_UNSET && compare(value, newValue)) {
-        return VALUE_KEEP; // No change needed
+      if (value !== UNCHANGED && compare(value, newValue)) {
+        return UNCHANGED; // No change needed
       }
       return newValue;
     },
     change(_entry, _value) {
-      return VALUE_KEEP; // Computed values are not directly changeable
+      return UNCHANGED; // Computed values are not directly changeable
     },
     getMember() {
       throw new InvalidMemberError();

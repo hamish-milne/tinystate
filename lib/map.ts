@@ -1,5 +1,5 @@
 import type { Kind, Schema, ValueOf } from "./common";
-import { KIND_WIDENING, ReadonlyError, VALUE_KEEP } from "./common";
+import { KIND_WIDENING, ReadonlyError, UNCHANGED } from "./common";
 
 class ReadonlyMapImpl<K, V> extends Map<K, V> implements ReadonlyMap<K, V> {
   constructor(entries?: readonly (readonly [K, V])[] | Iterable<readonly [K, V]> | null) {
@@ -63,7 +63,7 @@ export function map<K extends string, V extends Schema>(valueSchema: V): MapSche
         }
       }
       // We allow the members to call invalidate themselves, so we don't need to do anything here
-      return VALUE_KEEP;
+      return UNCHANGED;
     },
     getMember(_key: K) {
       return valueSchema;
