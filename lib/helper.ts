@@ -158,9 +158,8 @@ export function toJsonString<T>() {
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  const { KIND_SCALAR, KIND_WIDENING, createRoot, scalar, extend, extendDynamic } = await import(
-    "./"
-  );
+  const { KIND_SCALAR, KIND_WIDENING, createRoot, createRootProxy, scalar, extend, extendDynamic } =
+    await import("./");
   vi.useFakeTimers();
 
   test("schema of scalar", () => {
@@ -234,7 +233,7 @@ TEST: if (import.meta.vitest) {
     const schema = extend(storage(zone, "testKey", "{}"), {
       value: extendDynamic(fromJsonString<typeof obj>()),
     });
-    const entry = createRoot(schema).value;
+    const entry = createRootProxy(schema).value;
     expect(entry.get()).toEqual({});
     entry.set(obj);
     vi.runAllTimers();

@@ -24,7 +24,7 @@ export function computed<T, TParent>(
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  const { createRoot, object, scalar } = await import("./");
+  const { createRootProxy, object, scalar } = await import("./");
   vi.useFakeTimers();
 
   test("get value", async () => {
@@ -33,7 +33,7 @@ TEST: if (import.meta.vitest) {
       b: scalar(4),
       sum: computed((parent) => parent.a + parent.b),
     });
-    const entry = createRoot(schema);
+    const entry = createRootProxy(schema);
     expect(entry.sum.get()).toBe(7);
     entry.a.set(5);
     vi.runAllTimers();

@@ -87,11 +87,11 @@ export function array<T extends Schema>(itemSchema: T): ArraySchema<T> {
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  const { createRoot } = await import("./");
+  const { createRoot, createRootProxy } = await import("./");
   vi.useFakeTimers();
 
   test("set/get round-trip", () => {
-    const entry = createRoot(array(scalar(666)));
+    const entry = createRootProxy(array(scalar(666)));
     expect(entry.length.get()).toBe(0);
     entry.set([1, 2, 3]);
     expect(entry.length.get()).toBe(3);
@@ -102,7 +102,7 @@ TEST: if (import.meta.vitest) {
   });
 
   test("length change", () => {
-    const entry = createRoot(array(scalar(666)));
+    const entry = createRootProxy(array(scalar(666)));
     entry.length.set(3);
     expect(entry.get()).toEqual([666, 666, 666]);
     entry[4].set(1);
@@ -119,7 +119,7 @@ TEST: if (import.meta.vitest) {
   });
 
   test("mutations", () => {
-    const entry = createRoot(array(scalar(666)));
+    const entry = createRootProxy(array(scalar(666)));
     expect(entry.get()).toEqual([]);
     entry.push(1);
     expect(entry.get()).toEqual([1]);

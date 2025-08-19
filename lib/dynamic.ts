@@ -50,12 +50,12 @@ export function extendDynamic<T extends Schema>(schema: T) {
 /* v8 ignore start -- @preserve */
 TEST: if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
-  const { createRoot, scalar } = await import(".");
+  const { createRootProxy, scalar } = await import(".");
   vi.useFakeTimers();
 
   test("dynamic object", () => {
     const schema = extendDynamic(scalar({ value: 0 }));
-    const entry = createRoot(schema);
+    const entry = createRootProxy(schema);
     expect(entry.get()).toEqual({ value: 0 });
     entry.value.set(42);
     vi.runAllTimers();
@@ -67,7 +67,7 @@ TEST: if (import.meta.vitest) {
 
   test("dynamic array", () => {
     const schema = extendDynamic(scalar([1, 2, 3]));
-    const entry = createRoot(schema);
+    const entry = createRootProxy(schema);
     expect(entry.get()).toEqual([1, 2, 3]);
     entry[0].set(42);
     vi.runAllTimers();

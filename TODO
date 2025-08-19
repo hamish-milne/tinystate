@@ -9,8 +9,8 @@ Core features:
     ✔ Iterators for dependent/dependencies/all members @done(25-08-18 14:43)
     ✔ Getter flags: include defaults, include dependants @done(25-08-18 14:43)
     ✔ Flag for if entry is eligible for deletion @done(25-08-18 17:09)
-    ☐ Rework Entry revocation
-    ☐ Make Entry Proxy opt-in
+    ✔ Rework Entry revocation @done(25-08-19 12:26)
+    ✔ Make Entry Proxy opt-in @done(25-08-19 12:26)
   Manager:
     ✔ Basic implementation @done(25-08-11 12:24)
     ☐ Unit tests
@@ -52,3 +52,10 @@ Helpers:
   ✔ Form checkbox @done(25-08-11 12:57)
   ✔ Form radio button @done(25-08-11 12:57)
   ✔ Unit tests @done(25-08-14 17:52)
+Infra:
+  ☐ CI
+  ☐ NPM package
+  ☐ Documentation
+DX:
+  ☐ Error classes everywhere
+  ☐ toString for schema and entry

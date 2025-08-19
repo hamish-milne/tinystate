@@ -7,6 +7,7 @@ export * from "./extend.js";
 export * from "./helper.js";
 export * from "./map.js";
 export * from "./object.js";
+export * from "./proxy.js";
 export * from "./scalar.js";
 export * from "./set.js";
 export * from "./sync.js";

@@ -7,7 +7,7 @@ export type EntryOf<T extends Schema> = T extends Schema<infer A, infer B, infer
 
 export type ValueOf<T extends Schema> = T extends Schema<infer V> ? V : never;
 
-type MemberPairs<T extends AnyMembers> = {
+export type MemberPairs<T extends AnyMembers> = {
   [K in keyof T]: [K, EntryOf<T[K]>];
 }[keyof T];
 
@@ -113,69 +113,32 @@ export interface Entry<
   set(value: T): void;
   unset(): void;
   invalidate(): void;
-  recompute(): void;
-  notify(): void;
   subscribe(listener: Listener<T, TParent, TMembers, TMutations>): Cleanup;
-  isEmpty(): boolean;
   hasValue(): boolean;
-  members(flags?: MembersFlags): IterableIterator<MemberPairs<TMembers>, undefined>;
+  members(flags?: MembersFlags): IterableIterator<MemberPairs<TMembers>>;
   member<K extends keyof TMembers>(key: K): EntryOf<TMembers[K]>;
   get mutations(): TMutations;
   get parent(): Entry<TParent>;
   get kind(): Kind;
   get default(): T;
+  get oid(): object; // Unique identifier for the entry
 }
 
-const entryProxy: ProxyHandler<Entry> = {
-  get(target, p, _receiver) {
-    if (typeof p === "symbol" || p in target) {
-      return target[p as keyof Entry];
-    } else if (p in target.mutations) {
-      return target.mutations[p];
-    } else {
-      TEST: {
-        try {
-          // biome-ignore lint/suspicious/noGlobalIsNan: we're deliberately coercing to number
-          return target.member(isNaN(p as any) ? p : Number(p));
-        } catch {
-          return undefined;
-        }
-      }
-      // biome-ignore lint/suspicious/noGlobalIsNan: we're deliberately coercing to number
-      // biome-ignore lint/correctness/noUnreachable: the TEST block above will be removed
-      return target.member(isNaN(p as any) ? p : Number(p));
-    }
-  },
-};
-
-export type ProxyOf<T> = T extends Schema<any, any, infer C, infer D>
-  ? (string extends keyof D
-      ? unknown
-      : {
-          [K in Exclude<keyof D, keyof Entry>]: D[K];
-        }) &
-      (string extends keyof C
-        ? unknown
-        : {
-            [K in Exclude<keyof C, keyof Entry>]: ProxyOf<C[K]>;
-          }) &
-      EntryOf<T>
-  : never;
+const entryImpl = new WeakMap<object, EntryImpl>();
 
 class EntryImpl<
-    T = any,
-    TParent = any,
-    TMembers extends AnyMembers = any,
-    TMutations extends AnyMutations = any,
-  >
-  extends null
-  implements Entry<T, TParent, TMembers, TMutations>
-{
+  T = any,
+  TParent = any,
+  TMembers extends AnyMembers = any,
+  TMutations extends AnyMutations = any,
+> extends null {
   private declare readonly _schema: Schema<T, TParent, TMembers, TMutations>;
   private declare readonly _listeners: Set<Listener<T, TParent, TMembers, TMutations>>;
   private declare readonly _parent: EntryImpl<TParent> | undefined;
-  private declare readonly _members: Map<string, ReturnType<typeof Proxy.revocable<Entry>>>;
+  private declare readonly _members: Map<string, EntryImpl>;
   private declare readonly _manager: Manager;
+  declare readonly oid: object; // Unique identifier for the entry
+  declare readonly wrapper: EntryWrapper<T, TParent, TMembers, TMutations>;
   private declare _mutations: TMutations | undefined;
   private declare _value: T | typeof UNCHANGED;
   private declare _previous: T | typeof UNCHANGED;
@@ -183,8 +146,8 @@ class EntryImpl<
   private declare _default: T | typeof UNCHANGED;
 
   constructor(schema: Schema<T, TParent, TMembers, TMutations>, parent: EntryImpl | Manager) {
-    // @ts-expect-error
-    return {
+    const oid = Object.freeze({ __proto__: null });
+    const obj: EntryImpl<T, TParent, TMembers, TMutations> = {
       // @ts-expect-error
       __proto__: EntryImpl.prototype,
       _schema: schema,
@@ -197,31 +160,35 @@ class EntryImpl<
       _previous: UNCHANGED,
       _isComputing: false,
       _default: UNCHANGED,
+      oid,
+      wrapper: new EntryWrapper(oid),
     };
+    entryImpl.set(oid, obj);
+    return obj;
   }
 
-  get parent() {
+  _getParent() {
     if (!this._parent) {
       throw new NoParentError();
     }
-    return this._parent;
+    return this._parent.wrapper;
   }
 
-  get default(): T {
+  _getDefault(): T {
     if (this._default === UNCHANGED) {
       this._default = this._schema.computeDefault();
     }
     return this._default;
   }
 
-  get(flags?: MembersFlags): T {
+  _get(flags?: MembersFlags): T {
     if (this._value === UNCHANGED) {
       try {
         if (this._isComputing) {
           throw new Error("Recursive compute call detected");
         }
         this._isComputing = true;
-        const newValue = this._schema.compute(this, this._value, flags ?? MEMBERS_DEFAULT);
+        const newValue = this._schema.compute(this.wrapper, this._value, flags ?? MEMBERS_DEFAULT);
         if (newValue === UNCHANGED) {
           throw new Error("compute() returned UNCHANGED for entry without a value");
         }
@@ -233,50 +200,50 @@ class EntryImpl<
     return this._value;
   }
 
-  get kind(): Kind {
+  _getKind(): Kind {
     return this._schema.kind;
   }
 
-  hasValue(): boolean {
-    return this._schema.hasValue(this, this._value);
+  _hasValue(): boolean {
+    return this._schema.hasValue(this.wrapper, this._value);
   }
 
-  isEmpty(): boolean {
-    return !(this._listeners.size || this._members.size || this.hasValue());
+  _isEmpty(): boolean {
+    return !(this._listeners.size || this._members.size || this._hasValue());
   }
 
-  set(value: T): void {
-    const newValue = this._schema.change(this, value, this._value);
+  _set(value: T): void {
+    const newValue = this._schema.change(this.wrapper, value, this._value);
     if (newValue !== UNCHANGED) {
       this._value = newValue;
       this._checkDelete();
     }
   }
 
-  unset(): void {
-    if (this.kind === KIND_WIDENING) {
-      for (const [_key, member] of this.members()) {
+  _unset(): void {
+    if (this._getKind() === KIND_WIDENING) {
+      for (const [_key, member] of this._getMembers()) {
         member.unset();
       }
     }
-    this._schema.unset(this);
+    this._schema.unset(this.wrapper);
   }
 
-  invalidate(): void {
+  _invalidate(): void {
     const { kind } = this._schema;
     if (kind === KIND_WIDENING) {
       this._value = UNCHANGED;
     } else {
       if (this._manager._scheduleRecompute(this)) {
-        for (const [_, member] of this.members(MEMBERS_ALL)) {
+        for (const [_, member] of this._getMembers(MEMBERS_ALL)) {
           member.invalidate();
         }
       }
     }
     if (kind !== KIND_NARROWING) {
-      this._parent?.invalidate();
+      this._parent?._invalidate();
       if (this._manager._scheduleNotify(this)) {
-        for (const [_, member] of this.members(MEMBERS_ALL)) {
+        for (const [_, member] of this._getMembers(MEMBERS_ALL)) {
           if (member.kind === KIND_NARROWING) {
             member.invalidate();
           }
@@ -286,24 +253,24 @@ class EntryImpl<
   }
 
   private _checkDelete() {
-    if (this.isEmpty()) {
+    if (this._isEmpty()) {
       this._manager._scheduleDestroy(this);
     }
   }
 
-  garbageCollect(): void {
-    for (const [key, { revoke, proxy: member }] of this._members.entries()) {
-      if (!this._schema.isMemberPermanent(key) && member.isEmpty()) {
+  _garbageCollect(): void {
+    for (const [key, member] of this._members.entries()) {
+      if (!this._schema.isMemberPermanent(key) && member._isEmpty()) {
         this._members.delete(String(key));
-        revoke();
+        entryImpl.delete(member.oid);
       }
     }
-    if (this.isEmpty()) {
-      this._parent?.garbageCollect();
+    if (this._isEmpty()) {
+      this._parent?._garbageCollect();
     }
   }
 
-  subscribe(listener: Listener<T, TParent, TMembers, TMutations>): Cleanup {
+  _subscribe(listener: Listener<T, TParent, TMembers, TMutations>): Cleanup {
     this._listeners.add(listener);
     return () => {
       if (this._listeners.delete(listener)) {
@@ -312,39 +279,37 @@ class EntryImpl<
     };
   }
 
-  notify(): void {
+  _notify(): void {
     const previous = this._previous;
-    const value = this.get();
+    const value = this._get();
     this._previous = value;
     for (const listener of this._listeners) {
-      listener(value, previous, this);
+      listener(value, previous, this.wrapper);
     }
   }
 
-  recompute(): void {
-    const newValue = this._schema.compute(this, this._value, MEMBERS_DEFAULT);
+  _recompute(): void {
+    const newValue = this._schema.compute(this.wrapper, this._value, MEMBERS_DEFAULT);
     if (newValue !== UNCHANGED) {
       this._value = newValue;
       this._manager._scheduleNotify(this);
     }
   }
 
-  members(
-    flags: MembersFlags = MEMBERS_DEFAULT,
-  ): IterableIterator<MemberPairs<TMembers>, undefined> {
+  _getMembers(flags: MembersFlags = MEMBERS_DEFAULT): IterableIterator<MemberPairs<TMembers>> {
     const inner = this._members.entries();
     return {
       next() {
         let result = inner.next();
         if ((flags & MEMBERS_DEPENDANTS) === 0) {
-          while (!result.done && result.value[1].proxy.kind === KIND_NARROWING) {
+          while (!result.done && result.value[1]._getKind() === KIND_NARROWING) {
             result = inner.next();
           }
         }
         if (result.done) {
           return result;
         }
-        const [key, { proxy: value }] = result.value;
+        const [key, { wrapper: value }] = result.value;
         return {
           value: [key, value] as MemberPairs<TMembers>,
         };
@@ -355,19 +320,102 @@ class EntryImpl<
     };
   }
 
-  member<K extends keyof TMembers>(key: K): ProxyOf<TMembers[K]> {
+  _member<K extends keyof TMembers>(key: K): EntryOf<TMembers[K]> {
     let member = this._members.get(String(key));
     if (!member) {
       const schemaMember = this._schema.getMember(key);
-      member = Proxy.revocable(new EntryImpl(schemaMember, this), entryProxy);
+      member = new EntryImpl(schemaMember, this);
       this._members.set(String(key), member);
     }
-    return member.proxy as ProxyOf<TMembers[K]>;
+    return member.wrapper as Entry as EntryOf<TMembers[K]>;
+  }
+
+  _getMutations(): TMutations {
+    this._mutations ||= Object.freeze(this._schema.mutations(this.wrapper));
+    return this._mutations;
+  }
+}
+
+function getEntryImpl<
+  T = any,
+  TParent = any,
+  TMembers extends AnyMembers = any,
+  TMutations extends AnyMutations = any,
+>(
+  entry: EntryWrapper<T, TParent, TMembers, TMutations>,
+): EntryImpl<T, TParent, TMembers, TMutations> {
+  const impl = entryImpl.get(entry.oid);
+  if (!impl) {
+    throw new Error("Entry is not initialized or has been destroyed");
+  }
+  return impl;
+}
+
+class EntryWrapper<
+    T = any,
+    TParent = any,
+    TMembers extends AnyMembers = any,
+    TMutations extends AnyMutations = any,
+  >
+  extends null
+  implements Entry<T, TParent, TMembers, TMutations>
+{
+  declare readonly oid: object; // Unique identifier for the entry
+
+  constructor(oid: object) {
+    // @ts-expect-error
+    return Object.freeze({
+      __proto__: EntryWrapper.prototype,
+      oid,
+    });
+  }
+
+  get(flags?: MembersFlags): T {
+    return getEntryImpl(this)._get(flags);
+  }
+
+  set(value: T): void {
+    getEntryImpl(this)._set(value);
+  }
+
+  unset(): void {
+    getEntryImpl(this)._unset();
+  }
+
+  invalidate(): void {
+    getEntryImpl(this)._invalidate();
+  }
+
+  subscribe(listener: Listener<T, TParent, TMembers, TMutations>): Cleanup {
+    return getEntryImpl(this)._subscribe(listener);
+  }
+
+  hasValue(): boolean {
+    return getEntryImpl(this)._hasValue();
+  }
+
+  members(flags?: MembersFlags): IterableIterator<MemberPairs<TMembers>> {
+    return getEntryImpl(this)._getMembers(flags);
+  }
+
+  member<K extends keyof TMembers>(key: K): EntryOf<TMembers[K]> {
+    return getEntryImpl(this)._member(key);
   }
 
   get mutations(): TMutations {
-    this._mutations ||= Object.freeze(this._schema.mutations(this));
-    return this._mutations;
+    return getEntryImpl(this)._getMutations();
+  }
+
+  get parent(): Entry<TParent> {
+    return getEntryImpl(this)._getParent();
+  }
+
+  get kind(): Kind {
+    return getEntryImpl(this)._getKind();
+  }
+
+  get default(): T {
+    return getEntryImpl(this)._getDefault();
   }
 }
 
@@ -418,9 +466,9 @@ class Manager extends null {
     this._timeoutId = undefined;
 
     for (const [set, method] of [
-      [this._toRecompute, "recompute"],
-      [this._toNotify, "notify"],
-      [this._toDestroy, "garbageCollect"],
+      [this._toRecompute, "_recompute"],
+      [this._toNotify, "_notify"],
+      [this._toDestroy, "_garbageCollect"],
     ] as const) {
       const setCopy = Array.from(set);
       set.clear();
@@ -463,7 +511,7 @@ export function createRoot<T extends Schema>(
   schema: T,
   scheduler: Scheduler = (u) => window.setTimeout(u, 0),
 ) {
-  return new Proxy(new EntryImpl(schema, new Manager(scheduler)), entryProxy) as ProxyOf<T>;
+  return new EntryImpl(schema, new Manager(scheduler)).wrapper as EntryOf<T>;
 }
 
 const NARROWING_PROTO: Omit<Schema, "compute" | "change"> = {
@@ -514,5 +562,6 @@ TEST: if (import.meta.vitest) {
     entry1.unset();
     vi.runAllTimers();
     expect(root.member("a") === entry1).toBe(false);
+    expect(() => entry1.get()).toThrow(Error);
   });
 }

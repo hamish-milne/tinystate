@@ -1,12 +1,13 @@
 import type { ComponentProps } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { createRoot, type Entry, type ProxyOf, type Schema } from "./common";
+import type { Entry, Schema } from "./common";
 import { formCheckbox, formField, formRadio, type MethodProp, type ValueProp } from "./helper";
+import { createRootProxy, type ProxyOf } from "./proxy";
 
 export function useStateRoot<T extends Schema>(schema: T) {
   const ref = useRef<ProxyOf<T>>();
   if (!ref.current) {
-    ref.current = createRoot(schema);
+    ref.current = createRootProxy(schema);
   }
   return ref.current;
 }
