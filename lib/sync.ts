@@ -15,12 +15,11 @@ export function sync<T>(
     computeDefault() {
       throw new NotImplementedError();
     },
-    change(entry, value, prev) {
+    change(_entry, value, prev) {
       if (prev !== UNCHANGED && compare(value, prev)) {
         return UNCHANGED;
       }
       setter(value);
-      entry.invalidate();
       return value;
     },
     getMember(): never {

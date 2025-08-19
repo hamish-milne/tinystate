@@ -9,7 +9,7 @@ export type DynamicSchema<TParent, TKey extends keyof TParent> = Schema<
   Empty
 >;
 
-// NOTE: The conditional in DynamicMembers and the two 'as any' casts below are necessary
+// NOTE: The conditional in DynamicMembers and the cast below is necessary
 // to avoid a strange TypeScript issue that otherwise causes the type of DynamicMembers
 // to be inferred as `never`.
 
@@ -36,11 +36,11 @@ export function dynamic<TParent extends Record<any, any> | unknown[], TKey exten
       entry.parent.set(copy);
       return UNCHANGED;
     },
-    getMember: dynamic as any,
+    getMember: dynamic,
     isMemberPermanent() {
       return false; // Dynamic members are not permanent
     },
-  }) as any;
+  }) as DynamicMembers<TParent>[TKey];
 }
 
 export function extendDynamic<T extends Schema>(schema: T) {

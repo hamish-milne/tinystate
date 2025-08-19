@@ -137,31 +137,37 @@ class EntryImpl<
   private declare readonly _parent: EntryImpl<TParent> | undefined;
   private declare readonly _members: Map<string, EntryImpl>;
   private declare readonly _manager: Manager;
-  declare readonly oid: object; // Unique identifier for the entry
-  declare readonly wrapper: EntryWrapper<T, TParent, TMembers, TMutations>;
+  declare readonly _oid: object; // Unique identifier for the entry
+  declare readonly _wrapper: EntryWrapper<T, TParent, TMembers, TMutations>;
+  declare readonly _depth: number;
   private declare _mutations: TMutations | undefined;
   private declare _value: T | typeof UNCHANGED;
   private declare _previous: T | typeof UNCHANGED;
   private declare _isComputing: boolean;
   private declare _default: T | typeof UNCHANGED;
 
-  constructor(schema: Schema<T, TParent, TMembers, TMutations>, parent: EntryImpl | Manager) {
+  constructor(
+    schema: Schema<T, TParent, TMembers, TMutations>,
+    manager: Manager,
+    parent?: EntryImpl,
+  ) {
     const oid = Object.freeze({ __proto__: null });
     const obj: EntryImpl<T, TParent, TMembers, TMutations> = {
       // @ts-expect-error
       __proto__: EntryImpl.prototype,
       _schema: schema,
       _listeners: new Set(),
-      _parent: parent instanceof EntryImpl ? parent : undefined,
+      _parent: parent,
       _members: new Map(),
-      _manager: parent instanceof Manager ? parent : parent._manager,
+      _manager: manager,
       _mutations: undefined,
       _value: UNCHANGED,
       _previous: UNCHANGED,
       _isComputing: false,
       _default: UNCHANGED,
-      oid,
-      wrapper: new EntryWrapper(oid),
+      _oid: oid,
+      _wrapper: new EntryWrapper(oid),
+      _depth: parent ? parent._depth + 1 : 0,
     };
     entryImpl.set(oid, obj);
     return obj;
@@ -171,7 +177,7 @@ class EntryImpl<
     if (!this._parent) {
       throw new NoParentError();
     }
-    return this._parent.wrapper;
+    return this._parent._wrapper;
   }
 
   _getDefault(): T {
@@ -188,7 +194,7 @@ class EntryImpl<
           throw new Error("Recursive compute call detected");
         }
         this._isComputing = true;
-        const newValue = this._schema.compute(this.wrapper, this._value, flags ?? MEMBERS_DEFAULT);
+        const newValue = this._schema.compute(this._wrapper, this._value, flags ?? MEMBERS_DEFAULT);
         if (newValue === UNCHANGED) {
           throw new Error("compute() returned UNCHANGED for entry without a value");
         }
@@ -205,7 +211,7 @@ class EntryImpl<
   }
 
   _hasValue(): boolean {
-    return this._schema.hasValue(this.wrapper, this._value);
+    return this._schema.hasValue(this._wrapper, this._value);
   }
 
   _isEmpty(): boolean {
@@ -213,20 +219,16 @@ class EntryImpl<
   }
 
   _set(value: T): void {
-    const newValue = this._schema.change(this.wrapper, value, this._value);
+    const newValue = this._schema.change(this._wrapper, value, this._value);
     if (newValue !== UNCHANGED) {
       this._value = newValue;
+      this._invalidate();
       this._checkDelete();
     }
   }
 
   _unset(): void {
-    if (this._getKind() === KIND_WIDENING) {
-      for (const [_key, member] of this._getMembers()) {
-        member.unset();
-      }
-    }
-    this._schema.unset(this.wrapper);
+    this._schema.unset(this._wrapper);
   }
 
   _invalidate(): void {
@@ -235,17 +237,17 @@ class EntryImpl<
       this._value = UNCHANGED;
     } else {
       if (this._manager._scheduleRecompute(this)) {
-        for (const [_, member] of this._getMembers(MEMBERS_ALL)) {
-          member.invalidate();
+        for (const [_, member] of this._members) {
+          member._invalidate();
         }
       }
     }
     if (kind !== KIND_NARROWING) {
       this._parent?._invalidate();
       if (this._manager._scheduleNotify(this)) {
-        for (const [_, member] of this._getMembers(MEMBERS_ALL)) {
-          if (member.kind === KIND_NARROWING) {
-            member.invalidate();
+        for (const [_, member] of this._members) {
+          if (member._getKind() === KIND_NARROWING) {
+            member._invalidate();
           }
         }
       }
@@ -259,10 +261,10 @@ class EntryImpl<
   }
 
   _garbageCollect(): void {
-    for (const [key, member] of this._members.entries()) {
+    for (const [key, member] of this._members) {
       if (!this._schema.isMemberPermanent(key) && member._isEmpty()) {
         this._members.delete(String(key));
-        entryImpl.delete(member.oid);
+        entryImpl.delete(member._oid);
       }
     }
     if (this._isEmpty()) {
@@ -284,12 +286,12 @@ class EntryImpl<
     const value = this._get();
     this._previous = value;
     for (const listener of this._listeners) {
-      listener(value, previous, this.wrapper);
+      listener(value, previous, this._wrapper);
     }
   }
 
   _recompute(): void {
-    const newValue = this._schema.compute(this.wrapper, this._value, MEMBERS_DEFAULT);
+    const newValue = this._schema.compute(this._wrapper, this._value, MEMBERS_DEFAULT);
     if (newValue !== UNCHANGED) {
       this._value = newValue;
       this._manager._scheduleNotify(this);
@@ -309,7 +311,7 @@ class EntryImpl<
         if (result.done) {
           return result;
         }
-        const [key, { wrapper: value }] = result.value;
+        const [key, { _wrapper: value }] = result.value;
         return {
           value: [key, value] as MemberPairs<TMembers>,
         };
@@ -324,16 +326,20 @@ class EntryImpl<
     let member = this._members.get(String(key));
     if (!member) {
       const schemaMember = this._schema.getMember(key);
-      member = new EntryImpl(schemaMember, this);
+      member = new EntryImpl(schemaMember, this._manager, this);
       this._members.set(String(key), member);
     }
-    return member.wrapper as Entry as EntryOf<TMembers[K]>;
+    return member._wrapper as Entry as EntryOf<TMembers[K]>;
   }
 
   _getMutations(): TMutations {
-    this._mutations ||= Object.freeze(this._schema.mutations(this.wrapper));
+    this._mutations ||= Object.freeze(this._schema.mutations(this._wrapper));
     return this._mutations;
   }
+}
+
+function sortEntries(a: EntryImpl, b: EntryImpl): number {
+  return a._depth - b._depth;
 }
 
 function getEntryImpl<
@@ -466,15 +472,16 @@ class Manager extends null {
     this._timeoutId = undefined;
 
     for (const [set, method] of [
-      [this._toRecompute, "_recompute"],
-      [this._toNotify, "_notify"],
-      [this._toDestroy, "_garbageCollect"],
+      [this._toRecompute, EntryImpl.prototype._recompute],
+      [this._toNotify, EntryImpl.prototype._notify],
+      [this._toDestroy, EntryImpl.prototype._garbageCollect],
     ] as const) {
       const setCopy = Array.from(set);
       set.clear();
+      setCopy.sort(sortEntries);
       for (const entry of setCopy) {
         try {
-          entry[method]();
+          method.call(entry);
         } catch (error) {
           console.error(error);
         }
@@ -511,7 +518,7 @@ export function createRoot<T extends Schema>(
   schema: T,
   scheduler: Scheduler = (u) => window.setTimeout(u, 0),
 ) {
-  return new EntryImpl(schema, new Manager(scheduler)).wrapper as EntryOf<T>;
+  return new EntryImpl(schema, new Manager(scheduler))._wrapper as EntryOf<T>;
 }
 
 const NARROWING_PROTO: Omit<Schema, "compute" | "change"> = {

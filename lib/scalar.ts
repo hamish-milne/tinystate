@@ -18,11 +18,10 @@ export function scalar<T>(
     computeDefault() {
       return defaultValue;
     },
-    change(entry, value, prev) {
+    change(_entry, value, prev) {
       if (prev !== UNCHANGED && compare(value, prev)) {
         return UNCHANGED;
       }
-      entry.invalidate();
       return value;
     },
     getMember(): never {
