@@ -127,7 +127,7 @@ function segments(path: Key): string[] {
 }
 
 // Concatenates a prefix and key into a dot-separated path
-function concatPrefix(prefix: Key, key: Key): Key {
+function concatPath(prefix: Key, key: Key): Key {
   return prefix !== "" ? `${prefix}.${key}` : key;
 }
 
@@ -237,7 +237,7 @@ export function focus<T extends Record<Key, StateValue>, P extends keyof T & Key
   const impl = getImpl(store);
   const subStore = Object.freeze<Store<Focus<T, P>>>({
     [brand]: true,
-    prefix: concatPrefix(store.prefix, path),
+    prefix: concatPath(store.prefix, path),
   });
   implMap.set(subStore, impl);
   return subStore;
@@ -249,7 +249,7 @@ const isSafeObject = new WeakSet<StateObject | StateArray>();
 type PatchStack = [
   current: StateValue,
   next: StateValue,
-  prefix: Key,
+  path: Key,
   key: string,
   keys: string[] | null,
   changes: [string, StateValue][],
@@ -267,11 +267,11 @@ function patch(
   // We set `keys` to empty and `merge` to true, ensuring that the top-level change is always merged
   const stack: PatchStack = [[state, undefined, "", "", [], [], true]];
   for (const segment of segments(selector)) {
-    const [current, _, prefix] = stack[stack.length - 1];
+    const [current, _, path] = stack[stack.length - 1];
     stack.push([
       index(current, segment),
       undefined,
-      concatPrefix(prefix, segment),
+      concatPath(path, segment),
       segment,
       [],
       [],
@@ -285,7 +285,7 @@ function patch(
   lastStack[6] = mergeInput;
   const recursionCheck = new WeakSet();
   while (true) {
-    const [current, next, prefix, key, keys, changes, merge] = stack[stack.length - 1];
+    const [current, next, path, key, keys, changes, merge] = stack[stack.length - 1];
     let newValue: StateValue;
     if (keys) {
       // If `keys` is not null, we are iterating over the keys of `next`, or have finished iterating
@@ -295,7 +295,7 @@ function patch(
         stack.push([
           index(current, nextKey),
           index(next, nextKey),
-          concatPrefix(prefix, nextKey),
+          concatPath(path, nextKey),
           nextKey,
           null,
           [],
@@ -338,10 +338,14 @@ function patch(
     } else {
       // We need to merge `current` and `next` by iterating over the keys of `next`
       if (recursionCheck.has(next)) {
-        throw new Error(`Circular reference detected at path "${concatPrefix(prefix, key)}"`);
+        throw new Error(`Circular reference detected at path "${concatPath(path, key)}"`);
       }
       recursionCheck.add(next);
-      stack[stack.length - 1][4] = Object.keys(next).reverse();
+      const keys = Object.keys(next).reverse();
+      if (Array.isArray(next)) {
+        keys.push("length");
+      }
+      stack[stack.length - 1][4] = keys;
       continue;
     }
     // If we're here, we didn't modify the stack this iteration, so we can pop it
@@ -354,7 +358,7 @@ function patch(
     // Otherwise, apply the change to the parent
     if (newValue !== undefined) {
       stack[stack.length - 1][5].push([key, newValue]);
-      notify?.set(concatPrefix(prefix, key), newValue);
+      notify?.set(path, newValue);
     }
   }
 }
@@ -414,7 +418,7 @@ export function patchState<T extends AnyState, P extends keyof T & Key>(
 }
 
 if (import.meta.vitest) {
-  const { test, expect } = import.meta.vitest;
+  const { test, expect, vi } = import.meta.vitest;
 
   test("get initial state from a new store", () => {
     const store = createStore({ a: 1, b: { c: 2 } });
@@ -461,5 +465,21 @@ if (import.meta.vitest) {
     const store = createStore({ arr: [1, 2, 3] });
     patchState(store, "arr", { 1: 20 });
     expect(getState(store, "arr")).toEqual([1, 20, 3]);
+  });
+
+  test("listen to state changes", () => {
+    const store = createStore({ a: [1, 2, 3] });
+    const listener1 = vi.fn();
+    const listener2 = vi.fn();
+    const unsubscribe1 = listen(store, "a", listener1);
+    const unsubscribe2 = listen(store, "a.1", listener2);
+    setState(store, "a.1", 20);
+    expect(listener1).toHaveBeenCalledWith([1, 20, 3], "a");
+    expect(listener2).toHaveBeenCalledWith(20, "a.1");
+    unsubscribe1();
+    unsubscribe2();
+    setState(store, "a.2", 30);
+    expect(listener1).toHaveBeenCalledTimes(1);
+    expect(listener2).toHaveBeenCalledTimes(1);
   });
 }
