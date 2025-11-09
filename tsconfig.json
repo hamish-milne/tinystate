@@ -1,10 +1,12 @@
 {
-    "compilerOptions": {
-        "strict": true,
-        "target": "es2019",
-        "module": "es2015",
-        "lib": ["es2019", "dom"],
-        "verbatimModuleSyntax": true,
-        "jsx": "preserve"
-    }
+  "compilerOptions": {
+    "strict": true,
+    "target": "es2019",
+    "module": "es2020",
+    "moduleResolution": "bundler",
+    "lib": ["es2019", "dom"],
+    "verbatimModuleSyntax": true,
+    "jsx": "preserve",
+    "types": ["vitest/importMeta"]
+  }
 }

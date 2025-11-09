@@ -10,8 +10,6 @@
     "source.fixAll.biome": "explicit",
     "source.organizeImports.biome": "explicit"
   },
-  "cSpell.ignorePaths": [
-    ".vscode/**",
-    "yarn.lock"
-  ]
+  "cSpell.ignorePaths": [".vscode/**", "yarn.lock"],
+  "vitest.shellType": "child_process"
 }
