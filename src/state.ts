@@ -126,6 +126,14 @@ function segments(path: Key): string[] {
   return String(path).match(/[^.]+/g) || [];
 }
 
+function deepIndex(obj: StateValue, path: Key): StateValue {
+  let result = obj;
+  for (const segment of segments(path)) {
+    result = index(result, segment);
+  }
+  return result;
+}
+
 // Concatenates a prefix and key into a dot-separated path
 function concatPath(prefix: Key, key: Key): Key {
   return prefix !== "" ? `${prefix}.${key}` : key;
@@ -150,7 +158,7 @@ export function createStore<T extends StateValue>(initialState: T): Store<PathMa
     prefix: "",
   });
   const storeImpl = Object.preventExtensions<StoreImpl>({
-    _state: patch(null, "", initialState, null, false),
+    _state: patch(null, "", initialState, null, null, false),
     _listeners: new Map(),
   });
   implMap.set(store, storeImpl);
@@ -185,11 +193,7 @@ export function getState<T extends AnyState, P extends keyof T & Key>(
   store: Store<T>,
   path: P,
 ): T[P] {
-  let result: StateValue = getImpl(store)._state;
-  for (const segment of segments(path)) {
-    result = index(result, segment);
-  }
-  return result as T[P];
+  return deepIndex(getImpl(store)._state, concatPath(store.prefix, path)) as T[P];
 }
 
 /**
@@ -205,10 +209,11 @@ export function listen<T extends AnyState, P extends keyof T & Key>(
   listener: (value: T[P], path: P) => void,
 ): () => void {
   const impl = getImpl(store);
-  let listeners = impl._listeners.get(path);
+  const fullPath = concatPath(store.prefix, path);
+  let listeners = impl._listeners.get(fullPath);
   if (!listeners) {
     listeners = new Set();
-    impl._listeners.set(path, listeners);
+    impl._listeners.set(fullPath, listeners);
   }
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -261,6 +266,7 @@ function patch(
   selector: Key,
   patch: StateValue,
   notify: Map<Key, StateValue> | null,
+  listeners: Map<Key, unknown> | null,
   mergeInput: boolean,
 ): StateValue {
   // Setup the stack: add initial descent steps for each segment in the selector
@@ -306,6 +312,7 @@ function patch(
       // Finished iterating over keys; check for changes
       if (changes.length > 0) {
         let changeSet: Iterable<[string, StateValue]>;
+        let isArray: boolean;
         if (merge) {
           const oldEntries = current && typeof current === "object" ? Object.entries(current) : [];
           if (Array.isArray(current)) {
@@ -319,26 +326,39 @@ function patch(
               changesMap.set(k, v);
             }
           }
-          changeSet = changesMap.entries();
+          changeSet = changesMap;
+          isArray = typeof changesMap.get("length") === "number";
         } else {
           changeSet = changes;
+          isArray = Array.isArray(next);
         }
         const newObj = Object.fromEntries(changeSet);
-        newValue = Object.freeze(
-          typeof newObj.length === "number" ? Object.assign([], newObj) : newObj,
-        );
+        newValue = Object.freeze(isArray ? Object.assign([], newObj) : newObj);
         isSafeObject.add(newValue);
       }
       // If no changes, `nextValue` remains undefined
     } else if (current === next) {
       // No changes
-    } else if (typeof next !== "object" || !next || (!merge && isSafeObject.has(next))) {
-      // `next` is either a primitive, or a safe object that doesn't need merging
+    } else if (typeof next !== "object" || !next) {
       newValue = next;
+    } else if (!merge && isSafeObject.has(next)) {
+      newValue = next;
+      // If replacing an object with another 'safe' object, we can skip merging and use the new object directly
+      // But we need to manually notify sub-listeners of the change
+      if (listeners && notify) {
+        const listenerPrefix = `${path}.`;
+        for (const listenKey of listeners.keys()) {
+          if (typeof listenKey === "string" && listenKey.startsWith(listenerPrefix)) {
+            const subPath = listenKey.slice(listenerPrefix.length);
+            const subValue = deepIndex(newValue, subPath);
+            notify.set(concatPath(path, subPath), subValue);
+          }
+        }
+      }
     } else {
       // We need to merge `current` and `next` by iterating over the keys of `next`
       if (recursionCheck.has(next)) {
-        throw new Error(`Circular reference detected at path "${concatPath(path, key)}"`);
+        throw new Error(`Circular reference detected at path "${path}"`);
       }
       recursionCheck.add(next);
       const keys = Object.keys(next).reverse();
@@ -388,7 +408,14 @@ export function setState<T extends AnyState, P extends keyof T & Key>(
 ): void {
   const storeImpl = getImpl(store);
   const notify = new Map<Key, StateValue>();
-  storeImpl._state = patch(storeImpl._state, path, newValue, notify, false);
+  storeImpl._state = patch(
+    storeImpl._state,
+    concatPath(store.prefix, path),
+    newValue,
+    notify,
+    storeImpl._listeners,
+    false,
+  );
   notifyChange(storeImpl, notify);
 }
 
@@ -413,7 +440,14 @@ export function patchState<T extends AnyState, P extends keyof T & Key>(
 ): void {
   const storeImpl = getImpl(store);
   const notify = new Map<Key, StateValue>();
-  storeImpl._state = patch(storeImpl._state, path, patchValue as T[P], notify, true);
+  storeImpl._state = patch(
+    storeImpl._state,
+    concatPath(store.prefix, path),
+    patchValue as T[P],
+    notify,
+    storeImpl._listeners,
+    true,
+  );
   notifyChange(storeImpl, notify);
 }
 
@@ -424,11 +458,14 @@ if (import.meta.vitest) {
     const store = createStore({ a: 1, b: { c: 2 } });
     expect(getState(store, "a")).toBe(1);
     expect(getState(store, "b.c")).toBe(2);
+    expect(isStore(store)).toBe(true);
+    expect(isStore({})).toBe(false);
   });
 
   test("error after destroy", () => {
     const store = createStore({ a: 1 });
     destroyStore(store);
+    expect(isStore(store)).toBe(false);
     expect(() => getState(store, "a")).toThrow("Invalid store");
   });
 
@@ -445,6 +482,14 @@ if (import.meta.vitest) {
     setState(store, "b", { c: 20 });
     expect(getState(store, "b.c")).toBe(20);
     expect(getState(store, "b.d")).toBeUndefined();
+  });
+
+  test("patch primitive with object", () => {
+    const store = createStore({ a: 1 as number | { b: number }, b: null as null | { c: number } });
+    patchState(store, "a", { b: 2 });
+    expect(getState(store, "a.b")).toBe(2);
+    patchState(store, "b", { c: 3 });
+    expect(getState(store, "b.c")).toBe(3);
   });
 
   test("patch state with partial object", () => {
@@ -474,12 +519,65 @@ if (import.meta.vitest) {
     const unsubscribe1 = listen(store, "a", listener1);
     const unsubscribe2 = listen(store, "a.1", listener2);
     setState(store, "a.1", 20);
+    setState(store, "a.1", 20);
     expect(listener1).toHaveBeenCalledWith([1, 20, 3], "a");
     expect(listener2).toHaveBeenCalledWith(20, "a.1");
+    setState(store, "a", [2, 4, 6]);
+    expect(listener1).toHaveBeenCalledWith([2, 4, 6], "a");
+    expect(listener2).toHaveBeenCalledWith(4, "a.1");
     unsubscribe1();
     unsubscribe2();
     setState(store, "a.2", 30);
-    expect(listener1).toHaveBeenCalledTimes(1);
-    expect(listener2).toHaveBeenCalledTimes(1);
+    expect(listener1).toHaveBeenCalledTimes(2);
+    expect(listener2).toHaveBeenCalledTimes(2);
+  });
+
+  test("circular reference detection", () => {
+    const store = createStore({ a: 1 });
+    // biome-ignore lint/suspicious/noExplicitAny: for testing
+    const obj: any = { b: 2 };
+    obj.c = obj; // Create circular reference
+    expect(() => setState(store, "a", obj)).toThrow('Circular reference detected at path "a.c"');
+  });
+
+  test("unchanged objects are ref-stable", () => {
+    const store = createStore({ a: { b: 1 }, c: { b: 2 } });
+    const obj1 = getState(store, "a");
+    const obj2 = getState(store, "c");
+    patchState(store, "a", { b: 1 }); // No actual change
+    expect(getState(store, "a")).toBe(obj1); // Same reference
+    setState(store, "c.b", 3); // Actual change
+    expect(getState(store, "c")).not.toBe(obj2); // Different reference
+    setState(store, "c", obj1); // Set to same as `a`
+    expect(getState(store, "c")).toBe(obj1); // Same reference as `a`
+  });
+
+  test("replacing object by reference notifies sub-listeners", () => {
+    const store = createStore({ a: { b: 1 } });
+    const obj = getState(store, "a");
+    setState(store, "a", { b: 2 }); // Force new object
+    const listener = vi.fn();
+    listen(store, "a.b", listener);
+    setState(store, "a", obj); // Set back to original object
+    expect(listener).toHaveBeenCalledWith(1, "a.b");
+  });
+
+  test("focus creates sub-store", () => {
+    const store = createStore({ a: { b: 1, c: 2 }, d: 3 });
+    const subStore = focus(store, "a");
+    expect(getState(subStore, "b")).toBe(1);
+    expect(getState(subStore, "c")).toBe(2);
+    setState(subStore, "b", 10);
+    expect(getState(store, "a.b")).toBe(10);
+    const subSubStore = focus(subStore, "c");
+    expect(getState(subSubStore, "")).toBe(2);
+    setState(subSubStore, "", 20);
+    expect(getState(store, "a.c")).toBe(20);
+  });
+
+  test("focus with empty path returns same store", () => {
+    const store = createStore({ a: 1 });
+    const focusedStore = focus(store, "");
+    expect(focusedStore).toBe(store);
   });
 }

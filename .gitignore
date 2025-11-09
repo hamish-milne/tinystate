@@ -1,3 +1,4 @@
 /dist
 /.yarn
 /.pnp.*
+/node_modules
