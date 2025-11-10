@@ -23,7 +23,7 @@ export function formField<
   TValue extends ValueProp,
   T extends NonNullable<HTMLInputElement[TValue]>,
   P extends Key,
-  TMethod extends MethodProp | Lowercase<MethodProp>,
+  TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
 >(
   store: Store<{ [_ in P]: T }>,
   path: P,
@@ -61,11 +61,10 @@ export function formField<
  * <input type="checkbox" {...formCheckbox(store, "isSubscribed")} />
  * ```
  */
-export function formCheckbox<P extends Key, TMethod extends MethodProp | Lowercase<MethodProp>>(
-  store: Store<{ [_ in P]: boolean }>,
-  path: P,
-  method: TMethod = "onChange" as TMethod,
-) {
+export function formCheckbox<
+  P extends Key,
+  TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
+>(store: Store<{ [_ in P]: boolean }>, path: P, method: TMethod = "onChange" as TMethod) {
   return {
     ref(node: HTMLInputElement | null) {
       if (node) {
@@ -100,7 +99,7 @@ export function formCheckbox<P extends Key, TMethod extends MethodProp | Lowerca
 export function formRadio<
   P extends Key,
   K extends string,
-  TMethod extends MethodProp | Lowercase<MethodProp>,
+  TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
 >(store: Store<{ [_ in P]: K }>, path: P, option: K, method: TMethod = "onChange" as TMethod) {
   return {
     ref(node: HTMLInputElement | null) {
@@ -119,4 +118,63 @@ export function formRadio<
     value: option,
     type: "radio",
   };
+}
+
+if (import.meta.vitest) {
+  const { test, expect } = import.meta.vitest;
+  const { createStore } = await import("./state");
+
+  test("formField syncs string value", () => {
+    const store = createStore({ name: "Alice" });
+    const props = formField(store, "name", "value");
+    const input = document.createElement("input");
+    const unsubscribe = props.ref(input);
+    expect(input.value).toBe("Alice");
+    setState(store, "name", "Bob");
+    expect(input.value).toBe("Bob");
+    input.value = "Charlie";
+    // biome-ignore lint/suspicious/noExplicitAny: for testing
+    (props as any).onChange({ target: input });
+    expect(getState(store, "name")).toBe("Charlie");
+    unsubscribe?.();
+  });
+
+  test("formCheckbox syncs boolean value", () => {
+    const store = createStore({ subscribed: false as boolean });
+    const props = formCheckbox(store, "subscribed", "onChange");
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    const unsubscribe = props.ref(input);
+    expect(input.checked).toBe(false);
+    setState(store, "subscribed", true);
+    expect(input.checked).toBe(true);
+    input.checked = false;
+    // biome-ignore lint/suspicious/noExplicitAny: for testing
+    (props as any).onChange({ target: input });
+    expect(getState(store, "subscribed")).toBe(false);
+    unsubscribe?.();
+  });
+
+  test("formRadio syncs string value", () => {
+    const store = createStore({ color: "red" as string });
+    const propsRed = formRadio(store, "color", "red", "onChange");
+    const propsBlue = formRadio(store, "color", "blue", "onChange");
+    const inputRed = document.createElement("input");
+    inputRed.type = "radio";
+    const inputBlue = document.createElement("input");
+    inputBlue.type = "radio";
+    const unsubscribeRed = propsRed.ref(inputRed);
+    const unsubscribeBlue = propsBlue.ref(inputBlue);
+    expect(inputRed.checked).toBe(true);
+    expect(inputBlue.checked).toBe(false);
+    setState(store, "color", "blue");
+    expect(inputRed.checked).toBe(false);
+    expect(inputBlue.checked).toBe(true);
+    inputRed.checked = true;
+    // biome-ignore lint/suspicious/noExplicitAny: for testing
+    (propsRed as any).onChange({ target: inputRed });
+    expect(getState(store, "color")).toBe("red");
+    unsubscribeRed?.();
+    unsubscribeBlue?.();
+  });
 }
