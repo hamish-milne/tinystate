@@ -4,6 +4,12 @@ export default defineConfig({
   test: {
     includeSource: ["src/**/*.{ts,tsx}"],
     environment: "happy-dom",
+    coverage: {
+      enabled: true,
+      provider: "v8",
+      reporter: ["text", "json-summary", "json"],
+      reportOnFailure: true,
+    },
   },
   build: {
     target: "esnext",

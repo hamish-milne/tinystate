@@ -2,4 +2,5 @@
 /.yarn
 /.pnp.*
 /node_modules
+/coverage
 *.tsbuildinfo
