@@ -11,5 +11,6 @@
     "source.organizeImports.biome": "explicit"
   },
   "cSpell.ignorePaths": [".vscode/**", "yarn.lock"],
-  "vitest.shellType": "child_process"
+  "vitest.shellType": "child_process",
+  "editor.defaultFormatter": "biomejs.biome"
 }

@@ -451,6 +451,7 @@ export function patchState<T extends AnyState, P extends keyof T & Key>(
   notifyChange(storeImpl, notify);
 }
 
+/* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect, vi } = import.meta.vitest;
 

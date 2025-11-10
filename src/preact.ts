@@ -24,6 +24,11 @@ export function useStore<T>(): Store<T> {
 }
 
 /**
+ * Calculation function type for useWatch
+ */
+export type CalcFn<T, V = T> = (this: void, stateValue: T, prev: V | null) => V;
+
+/**
  * Hook to watch a specific path in the store's state and re-render when it changes.
  * @param store The Store object
  * @param path The path in the store to watch
@@ -65,4 +70,79 @@ export function useStoreState<T extends AnyState, P extends keyof T & Key>(
     [store, path],
   );
   return [value, setStateValue] as const;
+}
+
+/* v8 ignore start -- @preserve */
+if (import.meta.vitest) {
+  const { test, expect } = import.meta.vitest;
+  const { createStore } = await import("./state");
+  const { render, act } = await import("@testing-library/preact");
+  const { h } = await import("preact");
+
+  function renderTestComponent(store: Store, component: () => null) {
+    return render(h(StoreProvider, { value: store }, h(component, {})));
+  }
+
+  test("useStore and StoreProvider", () => {
+    const store = createStore({ count: 0 });
+    let usedStore: Store<{ count: number }> | null = null;
+    renderTestComponent(store, () => {
+      usedStore = useStore<{ count: number }>();
+      return null;
+    });
+    expect(usedStore).toBe(store);
+  });
+
+  test("useStore throws outside Provider", () => {
+    expect(() =>
+      render(
+        h(() => {
+          useStore();
+          return null;
+        }, {}),
+      ),
+    ).toThrow(/useStore\(\) must be used within a StoreProvider/);
+  });
+
+  test("useWatch updates on state change", () => {
+    const store = createStore({ count: 0 });
+    let renderedValue: number | null = null;
+    renderTestComponent(store, () => {
+      renderedValue = useWatch(store, "count");
+      return null;
+    });
+    expect(renderedValue).toBe(0);
+    act(() => setState(store, "count", 42));
+    expect(renderedValue).toBe(42);
+  });
+
+  test("useWatch with calc function", () => {
+    const store = createStore({ count: 1 });
+    let renderedValue: number | null = null;
+    renderTestComponent(store, () => {
+      renderedValue = useWatch(
+        store,
+        "count",
+        useCallback<CalcFn<number>>((stateValue) => stateValue * 2, []),
+      );
+      return null;
+    });
+    expect(renderedValue).toBe(2);
+    act(() => setState(store, "count", 3));
+    expect(renderedValue).toBe(6);
+  });
+
+  test("useStoreState provides state and setter", () => {
+    const store = createStore({ count: 0 });
+    let renderedValue: number | undefined;
+    let setCount: ((newValue: number) => void) | undefined;
+    renderTestComponent(store, () => {
+      [renderedValue, setCount] = useStoreState(store, "count");
+      return null;
+    });
+    expect(renderedValue).toBe(0);
+    expect(setCount).not.toBeUndefined();
+    act(() => setCount?.(100));
+    expect(renderedValue).toBe(100);
+  });
 }

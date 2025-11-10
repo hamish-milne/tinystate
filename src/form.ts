@@ -120,6 +120,7 @@ export function formRadio<
   };
 }
 
+/* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
   const { createStore } = await import("./state");
