@@ -1,6 +1,6 @@
 import { type Signal, signal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { type AnyState, getState, type Key, listen, type Store, setState } from "./state";
+import { type AnyState, getState, type Key, listen, type Store, setState } from "./core.js";
 
 export function useSignalStore<T extends AnyState>(
   store: Store<T>,
@@ -33,7 +33,7 @@ export function useSignalStore<T extends AnyState>(
 /* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
-  const { createStore } = await import("./state");
+  const { createStore } = await import("./core.js");
   const { render } = await import("@testing-library/preact");
   const { h } = await import("preact");
 

@@ -1,12 +1,22 @@
 {
   "compilerOptions": {
     "strict": true,
-    "target": "es2019",
-    "module": "es2022",
-    "moduleResolution": "bundler",
-    "lib": ["es2019", "dom"],
+    "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "composite": true,
+    "forceConsistentCasingInFileNames": true,
+    "erasableSyntaxOnly": true,
+    "target": "es2019",
+    "module": "node18",
+    "moduleResolution": "node16",
+    "lib": ["es2019", "dom"],
     "jsx": "preserve",
-    "types": ["vitest/importMeta"]
-  }
+    "types": ["vitest/importMeta"],
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "rootDir": "src",
+    "declarationDir": "dist"
+  },
+  "include": ["src"]
 }

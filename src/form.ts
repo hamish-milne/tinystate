@@ -1,4 +1,4 @@
-import { getState, type Key, listen, type Store, setState } from "./state";
+import { getState, type Key, listen, type Store, setState } from "./core.js";
 
 export type ValueProp = "value" | "valueAsNumber" | "valueAsDate";
 export type MethodProp = "onChange" | "onInput" | "onBlur";
@@ -123,7 +123,7 @@ export function formRadio<
 /* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
-  const { createStore } = await import("./state");
+  const { createStore } = await import("./core.js");
 
   test("formField syncs string value", () => {
     const store = createStore({ name: "Alice" });

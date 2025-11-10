@@ -5,4 +5,8 @@ export default defineConfig({
     includeSource: ["src/**/*.{ts,tsx}"],
     environment: "happy-dom",
   },
+  build: {
+    target: "esnext",
+    minify: false,
+  },
 });

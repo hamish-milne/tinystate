@@ -14,16 +14,7 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "suspicious": {
-        "noConfusingLabels": {
-          "level": "warn",
-          "options": {
-            "allowedLabels": ["TEST"]
-          }
-        }
-      },
       "correctness": {
-        "noUnusedLabels": "off",
         "noConstructorReturn": "off"
       }
     }
@@ -33,9 +24,9 @@
     "includes": [
       "**",
       "!**/.pnp*",
-      "!node_modules/**",
-      "!dist/**",
-      "!.yarn/**",
+      "!node_modules",
+      "!dist",
+      "!.yarn",
       "!**/.vscode/extensions.json"
     ]
   }

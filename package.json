@@ -1,14 +1,17 @@
 {
   "packageManager": "yarn@4.10.3",
+  "type": "module",
   "devDependencies": {
     "@biomejs/biome": "^2.3.4",
     "@preact/signals": "^2.4.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/preact": "^3.2.4",
     "@testing-library/react": "^16.3.0",
+    "@types/node": "^20.0.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^3.2.4",
+    "esbuild": "0.25.12",
     "happy-dom": "^20.0.10",
     "preact": "^10.27.2",
     "react": "^19.2.0",
@@ -16,8 +19,31 @@
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },
+  "peerDependencies": {
+    "@preact/signals": ">=2.0.0",
+    "preact": ">=10.0.0",
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@preact/signals": {
+      "optional": true
+    },
+    "preact": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
   "resolutions": {
     "@testing-library/dom": "^10.4.1",
-    "ansi-styles": "^6.1.0"
+    "ansi-styles": "^6.1.0",
+    "node-gyp": "npm:empty-npm-package@1.0.0"
+  },
+  "scripts": {
+    "lint": "biome lint",
+    "test": "vitest run",
+    "bundle": "esbuild --bundle ./src/index.ts --minify --format=esm --external:react --define:import.meta.vitest=undefined --outfile=./dist/index.js --analyze --mangle-props=^_",
+    "build": "tsc & yarn bundle"
   }
 }

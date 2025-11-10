@@ -2,3 +2,4 @@
 /.yarn
 /.pnp.*
 /node_modules
+*.tsbuildinfo

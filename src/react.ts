@@ -1,5 +1,5 @@
 import { createContext, type Provider, useCallback, useContext, useEffect, useState } from "react";
-import { type AnyState, getState, type Key, listen, type Store, setState } from "./state";
+import { type AnyState, getState, type Key, listen, type Store, setState } from "./core.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
 const StoreContext = createContext<Store<any> | null>(null);
@@ -74,7 +74,7 @@ export function useStoreState<T extends AnyState, P extends keyof T & Key>(
 /* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
-  const { createStore } = await import("./state");
+  const { createStore } = await import("./core.js");
   const { render, act } = await import("@testing-library/react");
   const { createElement } = await import("react");
 
