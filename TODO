@@ -1,0 +1,32 @@
+Core:
+    ✔ Create store @done(25-11-10 23:18)
+    ✔ Destroy store @done(25-11-10 23:18)
+    ✔ Focus @done(25-11-10 23:18)
+    ✔ Get state @done(25-11-10 23:18)
+    ✔ Set state @done(25-11-10 23:18)
+    ✔ Patch state @done(25-11-10 23:18)
+    ☐ Batch set state
+    ✔ Derived/readonly store @done(25-11-11 17:16)
+    ☐ Metadata store
+    ☐ Deferred updates
+Form:
+    ✔ Field @done(25-11-10 23:18)
+    ✔ Checkbox @done(25-11-10 23:18)
+    ✔ Radio button @done(25-11-10 23:18)
+    ☐ Field meta-state helper
+React/Preact:
+    ✔ Store provider @done(25-11-10 23:25)
+    ✔ State hook @done(25-11-10 23:25)
+    ✔ Preact signals @done(25-11-10 23:26)
+Misc:
+    ☐ 'sync' helper
+    ☐ LocalStorage helper
+    ☐ IndexedDB helper
+Admin:
+    ✔ CI @done(25-11-10 23:27)
+    ☐ NPM package
+Example app:
+    ☐ Basic 'todo' list
+    ☐ Storage back-ends
+    ☐ Field validation
+    ☐ Undo/redo

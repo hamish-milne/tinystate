@@ -251,6 +251,16 @@ export function focus<
   return subStore;
 }
 
+export function computed<T extends AnyState, P extends keyof T & Key, V extends AnyState>(
+  store: StoreView<T>,
+  path: P,
+  computeFn: (stateValue: T[P]) => V,
+): StoreView<V> {
+  const derived = createStore(computeFn(getState(store, path)));
+  listen(store, path, (newValue) => setState(derived, "", computeFn(newValue)));
+  return derived;
+}
+
 // Tracks objects that are safe to merge without cloning
 const isSafeObject = new WeakSet<StateObject | StateArray>();
 
@@ -374,14 +384,19 @@ function patch(
     // If we're here, we didn't modify the stack this iteration, so we can pop it
     recursionCheck.delete(next as object);
     stack.pop();
-    // If the stack is empty, we're done
-    if (stack.length === 0) {
-      return newValue === undefined ? state : newValue;
-    }
-    // Otherwise, apply the change to the parent
+    // If there is a new value, record the change:
     if (newValue !== undefined) {
-      stack[stack.length - 1][5].push([key, newValue]);
       notify?.set(path, newValue);
+      if (stack.length) {
+        stack[stack.length - 1][5].push([key, newValue]);
+      } else {
+        // If the stack is empty, we're done
+        return newValue;
+      }
+    }
+    // If the stack is empty with no new value, return the original state
+    if (!stack.length) {
+      return state;
     }
   }
 }
@@ -583,5 +598,27 @@ if (import.meta.vitest) {
     const store = createStore({ a: 1 });
     const focusedStore = focus(store, "");
     expect(focusedStore).toBe(store);
+  });
+
+  test("computed store reflects derived value", () => {
+    const store = createStore([1, 2, 3]);
+    const derived = computed(store, "", (arr) => ({
+      sum: arr.reduce((acc, val) => acc + val, 0),
+      max: Math.max(...arr),
+    }));
+    const lSum = vi.fn();
+    const lMax = vi.fn();
+    listen(derived, "sum", lSum);
+    listen(derived, "max", lMax);
+    expect(getState(derived, "sum")).toBe(6);
+    expect(getState(derived, "max")).toBe(3);
+    setState(store, 1, 5);
+    expect(getState(derived, "sum")).toBe(9);
+    expect(getState(derived, "max")).toBe(5);
+    expect(lSum).toHaveBeenCalledWith(9, "sum");
+    expect(lMax).toHaveBeenCalledWith(5, "max");
+    patchState(store, "", [-2, undefined, 6]);
+    expect(lMax).toHaveBeenCalledWith(6, "max");
+    expect(lSum).toBeCalledTimes(1); // sum didn't change
   });
 }
