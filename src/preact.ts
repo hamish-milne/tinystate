@@ -2,12 +2,12 @@ import { createContext, type Provider } from "preact";
 import { useCallback, useContext, useEffect, useState } from "preact/hooks";
 import {
   type AnyState,
-  getState,
   type Key,
   listen,
+  peek,
+  replace,
   type Store,
   type StoreView,
-  setState,
 } from "./core.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
@@ -49,7 +49,7 @@ export function useWatch<T extends AnyState, P extends keyof T & Key, V = T[P]>(
   calc?: (this: void, stateValue: T[P], prev: V | null) => V,
 ): V {
   const [value, setValue] = useState(() => {
-    const stateValue = getState(store, path);
+    const stateValue = peek(store, path);
     return calc ? calc(stateValue, null) : (stateValue as unknown as V);
   });
   useEffect(
@@ -74,7 +74,7 @@ export function useStoreState<T extends AnyState, P extends keyof T & Key>(
 ) {
   const value = useWatch(store, path);
   const setStateValue = useCallback(
-    (newValue: T[P]) => setState(store, path, newValue),
+    (newValue: T[P]) => replace(store, path, newValue),
     [store, path],
   );
   return [value, setStateValue] as const;
@@ -120,7 +120,7 @@ if (import.meta.vitest) {
       return null;
     });
     expect(renderedValue).toBe(0);
-    act(() => setState(store, "count", 42));
+    act(() => replace(store, "count", 42));
     expect(renderedValue).toBe(42);
   });
 
@@ -136,7 +136,7 @@ if (import.meta.vitest) {
       return null;
     });
     expect(renderedValue).toBe(2);
-    act(() => setState(store, "count", 3));
+    act(() => replace(store, "count", 3));
     expect(renderedValue).toBe(6);
   });
 

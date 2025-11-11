@@ -1,4 +1,4 @@
-import { getState, type Key, listen, type Store, setState } from "./core.js";
+import { type Key, listen, peek, replace, type Store } from "./core.js";
 
 export type ValueProp = "value" | "valueAsNumber" | "valueAsDate";
 export type MethodProp = "onChange" | "onInput" | "onBlur";
@@ -33,7 +33,7 @@ export function formField<
   return {
     ref(node: HTMLInputElement | null) {
       if (node) {
-        node[valueProp] = getState(store, path);
+        node[valueProp] = peek(store, path);
         return listen(store, path, (value) => {
           node[valueProp] = value;
         });
@@ -43,7 +43,7 @@ export function formField<
       if (isInputElement(target)) {
         const value = target[valueProp];
         if (value != null) {
-          setState(store, path, value as T);
+          replace(store, path, value as T);
         }
       }
     },
@@ -68,7 +68,7 @@ export function formCheckbox<
   return {
     ref(node: HTMLInputElement | null) {
       if (node) {
-        node.checked = getState(store, path);
+        node.checked = peek(store, path);
         return listen(store, path, (value) => {
           node.checked = value;
         });
@@ -76,7 +76,7 @@ export function formCheckbox<
     },
     [method]({ target }: Event) {
       if (isInputElement(target)) {
-        setState(store, path, target.checked);
+        replace(store, path, target.checked);
       }
     },
     type: "checkbox",
@@ -104,7 +104,7 @@ export function formRadio<
   return {
     ref(node: HTMLInputElement | null) {
       if (node) {
-        node.checked = getState(store, path) === option;
+        node.checked = peek(store, path) === option;
         return listen(store, path, (value) => {
           node.checked = value === option;
         });
@@ -112,7 +112,7 @@ export function formRadio<
     },
     [method]({ target }: Event) {
       if (isInputElement(target) && target.checked) {
-        setState(store, path, option);
+        replace(store, path, option);
       }
     },
     value: option,
@@ -131,12 +131,12 @@ if (import.meta.vitest) {
     const input = document.createElement("input");
     const unsubscribe = props.ref(input);
     expect(input.value).toBe("Alice");
-    setState(store, "name", "Bob");
+    replace(store, "name", "Bob");
     expect(input.value).toBe("Bob");
     input.value = "Charlie";
     // biome-ignore lint/suspicious/noExplicitAny: for testing
     (props as any).onChange({ target: input });
-    expect(getState(store, "name")).toBe("Charlie");
+    expect(peek(store, "name")).toBe("Charlie");
     unsubscribe?.();
   });
 
@@ -147,12 +147,12 @@ if (import.meta.vitest) {
     input.type = "checkbox";
     const unsubscribe = props.ref(input);
     expect(input.checked).toBe(false);
-    setState(store, "subscribed", true);
+    replace(store, "subscribed", true);
     expect(input.checked).toBe(true);
     input.checked = false;
     // biome-ignore lint/suspicious/noExplicitAny: for testing
     (props as any).onChange({ target: input });
-    expect(getState(store, "subscribed")).toBe(false);
+    expect(peek(store, "subscribed")).toBe(false);
     unsubscribe?.();
   });
 
@@ -168,13 +168,13 @@ if (import.meta.vitest) {
     const unsubscribeBlue = propsBlue.ref(inputBlue);
     expect(inputRed.checked).toBe(true);
     expect(inputBlue.checked).toBe(false);
-    setState(store, "color", "blue");
+    replace(store, "color", "blue");
     expect(inputRed.checked).toBe(false);
     expect(inputBlue.checked).toBe(true);
     inputRed.checked = true;
     // biome-ignore lint/suspicious/noExplicitAny: for testing
     (propsRed as any).onChange({ target: inputRed });
-    expect(getState(store, "color")).toBe("red");
+    expect(peek(store, "color")).toBe("red");
     unsubscribeRed?.();
     unsubscribeBlue?.();
   });

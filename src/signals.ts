@@ -1,6 +1,6 @@
 import { type Signal, signal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import { type AnyState, getState, type Key, listen, type Store, setState } from "./core.js";
+import { type AnyState, type Key, listen, peek, replace, type Store } from "./core.js";
 
 export function useSignalStore<T extends AnyState>(
   store: Store<T>,
@@ -18,13 +18,13 @@ export function useSignalStore<T extends AnyState>(
     if (sig) {
       return sig;
     }
-    const newSig = signal(getState(store, path));
+    const newSig = signal(peek(store, path));
     unsubscribes.push(
       listen(store, path, (newValue) => {
         newSig.value = newValue;
       }),
     );
-    newSig.subscribe((newValue) => setState(store, path, newValue));
+    newSig.subscribe((newValue) => replace(store, path, newValue));
     cache.set(path, newSig);
     return newSig;
   };
@@ -53,12 +53,12 @@ if (import.meta.vitest) {
     if (countSignal === undefined) return;
     expect(countSignal).toBe(countSignal2);
     expect(countSignal.value).toBe(0);
-    setState(store, "count", 5);
+    replace(store, "count", 5);
     expect(countSignal.value).toBe(5);
     countSignal.value = 10;
-    expect(getState(store, "count")).toBe(10);
+    expect(peek(store, "count")).toBe(10);
     result.unmount();
-    setState(store, "count", 15);
+    replace(store, "count", 15);
     expect(countSignal.value).toBe(10); // should not update after unmount
   });
 }
