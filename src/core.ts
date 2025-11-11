@@ -94,17 +94,19 @@ const brand = Symbol("Store");
  * @template T  The `PathMap` type representing the shape of the state in the store
  */
 // biome-ignore lint/correctness/noUnusedVariables: used for inference
-export interface Store<T = AnyState> {
+export interface StoreView<T = AnyState, Mutable extends boolean = boolean> {
   /**
    * Brand to identify Store objects
    */
-  readonly [brand]: true;
+  readonly [brand]: Mutable;
 
   /**
    * The prefix path for this store (empty string for the root store)
    */
   readonly prefix: Key;
 }
+
+export type Store<T = AnyState> = StoreView<T, true>;
 
 // Holds the actual mutable state and listeners for a Store
 interface StoreImpl {
@@ -114,7 +116,7 @@ interface StoreImpl {
 }
 
 // Maps Store objects to their implementations
-const implMap = new WeakMap<Store, StoreImpl>();
+const implMap = new WeakMap<StoreView, StoreImpl>();
 
 // Safely indexes into a StateValue object or array
 function index(obj: StateValue, key: string): StateValue | undefined {
@@ -139,7 +141,7 @@ function concatPath(prefix: Key, key: Key): Key {
   return prefix !== "" ? `${prefix}.${key}` : key;
 }
 
-function getImpl(store: Store): StoreImpl {
+function getImpl(store: StoreView): StoreImpl {
   const storeImpl = implMap.get(store);
   if (!storeImpl) {
     throw new Error("Invalid store");
@@ -170,7 +172,7 @@ export function createStore<T extends StateValue>(initialState: T): Store<PathMa
  * Note that this does not affect any focused sub-stores created from this store.
  * @param store The Store object to destroy
  */
-export function destroyStore(store: Store): void {
+export function destroyStore(store: StoreView): void {
   implMap.delete(store);
 }
 
@@ -180,7 +182,7 @@ export function destroyStore(store: Store): void {
  * @returns True if the value is a Store, false otherwise
  */
 export function isStore<T>(value: unknown): value is Store<T> {
-  return implMap.has(value as Store);
+  return implMap.has(value as StoreView);
 }
 
 /**
@@ -190,7 +192,7 @@ export function isStore<T>(value: unknown): value is Store<T> {
  * @returns The value at the specified path
  */
 export function getState<T extends AnyState, P extends keyof T & Key>(
-  store: Store<T>,
+  store: StoreView<T>,
   path: P,
 ): T[P] {
   return deepIndex(getImpl(store)._state, concatPath(store.prefix, path)) as T[P];
@@ -204,7 +206,7 @@ export function getState<T extends AnyState, P extends keyof T & Key>(
  * @returns A function to unregister the listener
  */
 export function listen<T extends AnyState, P extends keyof T & Key>(
-  store: Store<T>,
+  store: StoreView<T>,
   path: P,
   listener: (value: T[P], path: P) => void,
 ): () => void {
@@ -232,16 +234,17 @@ export type Focus<T extends Record<Key, StateValue>, P extends keyof T & Key> = 
  * @param path The path prefix for the sub-store
  * @returns A new Store object representing the sub-store
  */
-export function focus<T extends Record<Key, StateValue>, P extends keyof T & Key>(
-  store: Store<T>,
-  path: P,
-): Store<Focus<T, P>> {
+export function focus<
+  T extends Record<Key, StateValue>,
+  P extends keyof T & Key,
+  M extends boolean,
+>(store: StoreView<T, M>, path: P): StoreView<Focus<T, P>, M> {
   if (path === "") {
-    return store as Store<Focus<T, P>>;
+    return store as StoreView<Focus<T, P>, M>;
   }
   const impl = getImpl(store);
-  const subStore = Object.freeze<Store<Focus<T, P>>>({
-    [brand]: true,
+  const subStore = Object.freeze<StoreView<Focus<T, P>, M>>({
+    [brand]: store[brand],
     prefix: concatPath(store.prefix, path),
   });
   implMap.set(subStore, impl);

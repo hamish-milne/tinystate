@@ -1,5 +1,13 @@
 import { createContext, type Provider, useCallback, useContext, useEffect, useState } from "react";
-import { type AnyState, getState, type Key, listen, type Store, setState } from "./core.js";
+import {
+  type AnyState,
+  getState,
+  type Key,
+  listen,
+  type Store,
+  type StoreView,
+  setState,
+} from "./core.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
 const StoreContext = createContext<Store<any> | null>(null);
@@ -35,7 +43,7 @@ export type CalcFn<T, V = T> = (this: void, stateValue: T, prev: V | null) => V;
  * @returns The current value at the specified path, or the calculated value
  */
 export function useWatch<T extends AnyState, P extends keyof T & Key, V = T[P]>(
-  store: Store<T>,
+  store: StoreView<T>,
   path: P,
   calc?: CalcFn<T[P], V>,
 ): V {
@@ -84,7 +92,7 @@ if (import.meta.vitest) {
 
   test("useStore and StoreProvider", () => {
     const store = createStore({ count: 0 });
-    let usedStore: Store<{ count: number }> | null = null;
+    let usedStore: StoreView<{ count: number }> | null = null;
     renderTestComponent(store, () => {
       usedStore = useStore<{ count: number }>();
       return null;

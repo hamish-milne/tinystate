@@ -1,6 +1,14 @@
 import { createContext, type Provider } from "preact";
 import { useCallback, useContext, useEffect, useState } from "preact/hooks";
-import { type AnyState, getState, type Key, listen, type Store, setState } from "./core.js";
+import {
+  type AnyState,
+  getState,
+  type Key,
+  listen,
+  type Store,
+  type StoreView,
+  setState,
+} from "./core.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
 const StoreContext = createContext<Store<any> | null>(null);
@@ -15,7 +23,7 @@ export const StoreProvider = StoreContext.Provider as Provider<Store<any>>;
  * Hook to access the Store from the React context.
  * @returns The Store object
  */
-export function useStore<T>(): Store<T> {
+export function useStore<T>(): StoreView<T> {
   const store = useContext(StoreContext);
   if (!store) {
     throw new Error("useStore() must be used within a StoreProvider");
@@ -36,7 +44,7 @@ export type CalcFn<T, V = T> = (this: void, stateValue: T, prev: V | null) => V;
  * @returns The current value at the specified path, or the calculated value
  */
 export function useWatch<T extends AnyState, P extends keyof T & Key, V = T[P]>(
-  store: Store<T>,
+  store: StoreView<T>,
   path: P,
   calc?: (this: void, stateValue: T[P], prev: V | null) => V,
 ): V {
@@ -85,7 +93,7 @@ if (import.meta.vitest) {
 
   test("useStore and StoreProvider", () => {
     const store = createStore({ count: 0 });
-    let usedStore: Store<{ count: number }> | null = null;
+    let usedStore: StoreView<{ count: number }> | null = null;
     renderTestComponent(store, () => {
       usedStore = useStore<{ count: number }>();
       return null;
