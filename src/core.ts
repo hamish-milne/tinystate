@@ -12,6 +12,8 @@ type StateArray = readonly StateValue[];
  */
 export type Key = string | number;
 
+export type KeyOf<T> = Exclude<keyof T, symbol>;
+
 type ConcatPrefix<Prefix extends Key, Suffix extends Key> = Prefix extends ""
   ? Suffix
   : `${Prefix}.${Suffix}`;
@@ -51,8 +53,8 @@ type _PathMap<Prefix extends Key, T> = T extends Primitive
     ? PathMap<ConcatPrefix<Prefix, number>, T[number]>
     : UnionToIntersection<
         {
-          [K in keyof T & Key]: PathMap<ConcatPrefix<Prefix, K>, T[K]>;
-        }[keyof T & Key]
+          [K in KeyOf<T>]: PathMap<ConcatPrefix<Prefix, K>, T[K]>;
+        }[KeyOf<T>]
       >;
 
 /**
@@ -64,7 +66,7 @@ type _PathMap<Prefix extends Key, T> = T extends Primitive
  * // Result: "foo" | "foo.bar" | "foo.baz" | `foo.baz.${number}` | "qux"
  * ```
  */
-export type PathOf<T> = keyof PathMap<"", T> & Key;
+export type PathOf<T> = PathMap<"", T>;
 
 /**
  * The value type at path `P` in state type `T`.
@@ -191,10 +193,7 @@ export function isStore<T>(value: unknown): value is Store<T> {
  * @param path The path to retrieve
  * @returns The value at the specified path
  */
-export function peek<T extends AnyState, P extends keyof T & Key>(
-  store: StoreView<T>,
-  path: P,
-): T[P] {
+export function peek<T extends AnyState, P extends KeyOf<T>>(store: StoreView<T>, path: P): T[P] {
   return deepIndex(getImpl(store)._state, concatPath(store.prefix, path)) as T[P];
 }
 
@@ -205,7 +204,7 @@ export function peek<T extends AnyState, P extends keyof T & Key>(
  * @param listener The listener function to call on changes
  * @returns A function to unregister the listener
  */
-export function listen<T extends AnyState, P extends keyof T & Key>(
+export function listen<T extends AnyState, P extends KeyOf<T>>(
   store: StoreView<T>,
   path: P,
   listener: (value: T[P], path: P) => void,
@@ -224,7 +223,7 @@ export function listen<T extends AnyState, P extends keyof T & Key>(
 /**
  * Type that represents a sub-store focused on the state at the specified path prefix.
  */
-export type Focus<T extends Record<Key, StateValue>, P extends keyof T & Key> = "" extends P
+export type Focus<T extends Record<Key, StateValue>, P extends KeyOf<T>> = "" extends P
   ? T
   : { [K in keyof T as P extends K ? "" : K extends `${P}.${infer Rest}` ? Rest : never]: T[K] };
 
@@ -234,11 +233,10 @@ export type Focus<T extends Record<Key, StateValue>, P extends keyof T & Key> = 
  * @param path The path prefix for the sub-store
  * @returns A new Store object representing the sub-store
  */
-export function focus<
-  T extends Record<Key, StateValue>,
-  P extends keyof T & Key,
-  M extends boolean,
->(store: StoreView<T, M>, path: P): StoreView<Focus<T, P>, M> {
+export function focus<T extends Record<Key, StateValue>, P extends KeyOf<T>, M extends boolean>(
+  store: StoreView<T, M>,
+  path: P,
+): StoreView<Focus<T, P>, M> {
   if (path === "") {
     return store as StoreView<Focus<T, P>, M>;
   }
@@ -251,13 +249,13 @@ export function focus<
   return subStore;
 }
 
-export function computed<T extends AnyState, P extends keyof T & Key, V extends AnyState>(
+export function computed<T extends AnyState, P extends KeyOf<T>, V extends AnyState>(
   store: StoreView<T>,
   path: P,
   computeFn: (stateValue: T[P]) => V,
 ): StoreView<V> {
   const derived = createStore(computeFn(peek(store, path)));
-  listen(store, path, (newValue) => replace(derived, "", computeFn(newValue)));
+  listen(store, path, (newValue) => replace(derived, computeFn(newValue)));
   return derived;
 }
 
@@ -401,6 +399,24 @@ function patchStateValue(
   }
 }
 
+function patchStore(
+  store: Store,
+  storeImpl: StoreImpl,
+  path: Key,
+  newValue: StateValue,
+  notify: Map<Key, StateValue>,
+  merge: boolean,
+) {
+  storeImpl._state = patchStateValue(
+    storeImpl._state,
+    concatPath(store.prefix, path),
+    newValue,
+    notify,
+    storeImpl._listeners,
+    merge,
+  );
+}
+
 // Notifies listeners of changes recorded in the `notify` map
 function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>) {
   for (const [changedPath, value] of notify) {
@@ -414,26 +430,47 @@ function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>) {
 }
 
 /**
- * Sets the value at the specified path in the store's state.
+ * Replaces the value at the root of the store's state.
  * @param store The Store object
- * @param path The path to set
- * @param newValue The new value to set at the specified path
+ * @param newValue The new state value
  */
-export function replace<T extends AnyState, P extends keyof T & Key>(
-  store: Store<T>,
-  path: P,
-  newValue: T[P],
-): void {
+export function replace<T extends AnyState>(store: Store<T>, newValue: T[""]): void {
   const storeImpl = getImpl(store);
   const notify = new Map<Key, StateValue>();
   storeImpl._state = patchStateValue(
     storeImpl._state,
-    concatPath(store.prefix, path),
+    store.prefix,
     newValue,
     notify,
     storeImpl._listeners,
     false,
   );
+  notifyChange(storeImpl, notify);
+}
+
+type PathPair<T extends AnyState> = { [K in keyof T]: [K, T[K]] }[Exclude<keyof T, symbol>];
+
+/**
+ * Sets multiple values in the store's state in a single batch operation.
+ * @param store The Store object
+ * @param replacement An object where keys are paths and values are the new values to set
+ */
+export function update<T extends AnyState>(
+  store: Store<T>,
+  ...replacements: ({ [K in keyof T]?: T[K] } | PathPair<T>)[]
+): void {
+  const storeImpl = getImpl(store);
+  const notify = new Map<Key, StateValue>();
+  for (const replacement of replacements) {
+    if (Array.isArray(replacement)) {
+      const [path, value] = replacement;
+      patchStore(store, storeImpl, path, value, notify, false);
+    } else {
+      for (const key in replacement) {
+        patchStore(store, storeImpl, key, replacement[key], notify, false);
+      }
+    }
+  }
   notifyChange(storeImpl, notify);
 }
 
@@ -451,21 +488,14 @@ type PatchSpec<T> = T extends Primitive
  * @param path The path to patch
  * @param patchValue The patch object to merge at the specified path
  */
-export function patch<T extends AnyState, P extends keyof T & Key>(
+export function patch<T extends AnyState, P extends KeyOf<T>>(
   store: Store<T>,
   path: P,
   patchValue: T[P] | PatchSpec<T[P]> | Partial<T[P]>,
 ): void {
   const storeImpl = getImpl(store);
   const notify = new Map<Key, StateValue>();
-  storeImpl._state = patchStateValue(
-    storeImpl._state,
-    concatPath(store.prefix, path),
-    patchValue as T[P],
-    notify,
-    storeImpl._listeners,
-    true,
-  );
+  patchStore(store, storeImpl, path, patchValue as T[P], notify, true);
   notifyChange(storeImpl, notify);
 }
 
@@ -490,15 +520,15 @@ if (import.meta.vitest) {
 
   test("set state and get updated value", () => {
     const store = createStore({ a: 1, b: { c: 2 } });
-    replace(store, "a", 10);
-    replace(store, "b.c", 20);
+    update(store, { a: 10 });
+    update(store, ["b.c", 20]);
     expect(peek(store, "a")).toBe(10);
     expect(peek(store, "b.c")).toBe(20);
   });
 
   test("replace object with missing keys", () => {
     const store = createStore({ a: 1, b: { c: 2, d: 3 } as { c: number; d?: number } });
-    replace(store, "b", { c: 20 });
+    update(store, { b: { c: 20 } });
     expect(peek(store, "b.c")).toBe(20);
     expect(peek(store, "b.d")).toBeUndefined();
   });
@@ -537,16 +567,16 @@ if (import.meta.vitest) {
     const listener2 = vi.fn();
     const unsubscribe1 = listen(store, "a", listener1);
     const unsubscribe2 = listen(store, "a.1", listener2);
-    replace(store, "a.1", 20);
-    replace(store, "a.1", 20);
+    update(store, { "a.1": 20 });
+    update(store, { "a.1": 20 });
     expect(listener1).toHaveBeenCalledWith([1, 20, 3], "a");
     expect(listener2).toHaveBeenCalledWith(20, "a.1");
-    replace(store, "a", [2, 4, 6]);
+    update(store, { a: [2, 4, 6] });
     expect(listener1).toHaveBeenCalledWith([2, 4, 6], "a");
     expect(listener2).toHaveBeenCalledWith(4, "a.1");
     unsubscribe1();
     unsubscribe2();
-    replace(store, "a.2", 30);
+    update(store, ["a.2", 30]);
     expect(listener1).toHaveBeenCalledTimes(2);
     expect(listener2).toHaveBeenCalledTimes(2);
   });
@@ -556,7 +586,7 @@ if (import.meta.vitest) {
     // biome-ignore lint/suspicious/noExplicitAny: for testing
     const obj: any = { b: 2 };
     obj.c = obj; // Create circular reference
-    expect(() => replace(store, "a", obj)).toThrow('Circular reference detected at path "a.c"');
+    expect(() => update(store, { a: obj })).toThrow('Circular reference detected at path "a.c"');
   });
 
   test("unchanged objects are ref-stable", () => {
@@ -565,19 +595,19 @@ if (import.meta.vitest) {
     const obj2 = peek(store, "c");
     patch(store, "a", { b: 1 }); // No actual change
     expect(peek(store, "a")).toBe(obj1); // Same reference
-    replace(store, "c.b", 3); // Actual change
+    update(store, { "c.b": 3 }); // Actual change
     expect(peek(store, "c")).not.toBe(obj2); // Different reference
-    replace(store, "c", obj1); // Set to same as `a`
+    update(store, { c: obj1 }); // Set to same as `a`
     expect(peek(store, "c")).toBe(obj1); // Same reference as `a`
   });
 
   test("replacing object by reference notifies sub-listeners", () => {
     const store = createStore({ a: { b: 1 } });
     const obj = peek(store, "a");
-    replace(store, "a", { b: 2 }); // Force new object
+    update(store, { a: { b: 2 } }); // Force new object
     const listener = vi.fn();
     listen(store, "a.b", listener);
-    replace(store, "a", obj); // Set back to original object
+    update(store, { a: obj }); // Set back to original object
     expect(listener).toHaveBeenCalledWith(1, "a.b");
   });
 
@@ -586,11 +616,11 @@ if (import.meta.vitest) {
     const subStore = focus(store, "a");
     expect(peek(subStore, "b")).toBe(1);
     expect(peek(subStore, "c")).toBe(2);
-    replace(subStore, "b", 10);
+    update(subStore, { b: 10 });
     expect(peek(store, "a.b")).toBe(10);
     const subSubStore = focus(subStore, "c");
     expect(peek(subSubStore, "")).toBe(2);
-    replace(subSubStore, "", 20);
+    replace(subSubStore, 20);
     expect(peek(store, "a.c")).toBe(20);
   });
 
@@ -612,7 +642,7 @@ if (import.meta.vitest) {
     listen(derived, "max", lMax);
     expect(peek(derived, "sum")).toBe(6);
     expect(peek(derived, "max")).toBe(3);
-    replace(store, 1, 5);
+    update(store, { 1: 5 });
     expect(peek(derived, "sum")).toBe(9);
     expect(peek(derived, "max")).toBe(5);
     expect(lSum).toHaveBeenCalledWith(9, "sum");

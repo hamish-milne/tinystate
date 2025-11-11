@@ -2,12 +2,13 @@ import { createContext, type Provider } from "preact";
 import { useCallback, useContext, useEffect, useState } from "preact/hooks";
 import {
   type AnyState,
-  type Key,
+  type KeyOf,
   listen,
   peek,
   replace,
   type Store,
   type StoreView,
+  update,
 } from "./core.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
@@ -43,7 +44,7 @@ export type CalcFn<T, V = T> = (this: void, stateValue: T, prev: V | null) => V;
  * @param calc Optional calculation function to derive a value from the state. Remember to wrap in {@link useCallback} if needed.
  * @returns The current value at the specified path, or the calculated value
  */
-export function useWatch<T extends AnyState, P extends keyof T & Key, V = T[P]>(
+export function useWatch<T extends AnyState, P extends KeyOf<T>, V = T[P]>(
   store: StoreView<T>,
   path: P,
   calc?: (this: void, stateValue: T[P], prev: V | null) => V,
@@ -68,13 +69,13 @@ export function useWatch<T extends AnyState, P extends keyof T & Key, V = T[P]>(
  * @param path The path in the store to bind to
  * @returns A tuple containing the current value and a setter function
  */
-export function useStoreState<T extends AnyState, P extends keyof T & Key>(
+export function useStoreState<T extends AnyState, P extends Exclude<keyof T, symbol>>(
   store: Store<T>,
   path: P,
 ) {
   const value = useWatch(store, path);
   const setStateValue = useCallback(
-    (newValue: T[P]) => replace(store, path, newValue),
+    (newValue: T[P]) => update(store, [path, newValue]),
     [store, path],
   );
   return [value, setStateValue] as const;
@@ -120,7 +121,7 @@ if (import.meta.vitest) {
       return null;
     });
     expect(renderedValue).toBe(0);
-    act(() => replace(store, "count", 42));
+    act(() => replace(store, { count: 42 }));
     expect(renderedValue).toBe(42);
   });
 
@@ -136,7 +137,7 @@ if (import.meta.vitest) {
       return null;
     });
     expect(renderedValue).toBe(2);
-    act(() => replace(store, "count", 3));
+    act(() => update(store, { count: 3 }));
     expect(renderedValue).toBe(6);
   });
 

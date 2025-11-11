@@ -1,4 +1,4 @@
-import { type Key, listen, peek, replace, type Store } from "./core.js";
+import { type Key, listen, peek, type Store, update } from "./core.js";
 
 export type ValueProp = "value" | "valueAsNumber" | "valueAsDate";
 export type MethodProp = "onChange" | "onInput" | "onBlur";
@@ -43,7 +43,7 @@ export function formField<
       if (isInputElement(target)) {
         const value = target[valueProp];
         if (value != null) {
-          replace(store, path, value as T);
+          update(store, [path, value as T]);
         }
       }
     },
@@ -76,7 +76,7 @@ export function formCheckbox<
     },
     [method]({ target }: Event) {
       if (isInputElement(target)) {
-        replace(store, path, target.checked);
+        update(store, [path, target.checked]);
       }
     },
     type: "checkbox",
@@ -112,7 +112,7 @@ export function formRadio<
     },
     [method]({ target }: Event) {
       if (isInputElement(target) && target.checked) {
-        replace(store, path, option);
+        update(store, [path, option]);
       }
     },
     value: option,
@@ -131,7 +131,7 @@ if (import.meta.vitest) {
     const input = document.createElement("input");
     const unsubscribe = props.ref(input);
     expect(input.value).toBe("Alice");
-    replace(store, "name", "Bob");
+    update(store, ["name", "Bob"]);
     expect(input.value).toBe("Bob");
     input.value = "Charlie";
     // biome-ignore lint/suspicious/noExplicitAny: for testing
@@ -147,7 +147,7 @@ if (import.meta.vitest) {
     input.type = "checkbox";
     const unsubscribe = props.ref(input);
     expect(input.checked).toBe(false);
-    replace(store, "subscribed", true);
+    update(store, { subscribed: true });
     expect(input.checked).toBe(true);
     input.checked = false;
     // biome-ignore lint/suspicious/noExplicitAny: for testing
@@ -168,7 +168,7 @@ if (import.meta.vitest) {
     const unsubscribeBlue = propsBlue.ref(inputBlue);
     expect(inputRed.checked).toBe(true);
     expect(inputBlue.checked).toBe(false);
-    replace(store, "color", "blue");
+    update(store, { color: "blue" });
     expect(inputRed.checked).toBe(false);
     expect(inputBlue.checked).toBe(true);
     inputRed.checked = true;
