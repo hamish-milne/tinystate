@@ -51,6 +51,48 @@ export function formField<
 }
 
 /**
+ * Creates props for a text input, textarea, or select element that syncs with the store at the specified path.
+ * @param store The Store object
+ * @param path The path in the store to bind to
+ * @param method The event method to listen for changes (default is "onChange")
+ * @returns An object to be spread onto a text input, textarea, or select element
+ * @example
+ * ```tsx
+ * <input type="text" {...formText(store, "firstName")} />
+ * <textarea {...formText(store, "bio", "onInput")}></textarea>
+ * <select {...formText(store, "country")}>
+ *   <option value="us">United States</option>
+ *   <option value="ca">Canada</option>
+ * </select>
+ * ```
+ */
+export function formText<
+  T extends string,
+  P extends Key,
+  TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
+>(store: Store<{ [_ in P]: T }>, path: P, method: TMethod = "onChange" as TMethod) {
+  return {
+    ref(node: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) {
+      if (node) {
+        node.value = peek(store, path);
+        return listen(store, path, (value) => {
+          node.value = value;
+        });
+      }
+    },
+    [method]({ target }: Event) {
+      if (
+        isInputElement(target) ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement
+      ) {
+        update(store, [path, target.value as T]);
+      }
+    },
+  };
+}
+
+/**
  * Creates props for a checkbox input that syncs with the store at the specified path.
  * @param store The Store object
  * @param path The path in the store to bind to
@@ -123,12 +165,34 @@ export function formRadio<
 /* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
-  const { createStore } = await import("./core.js");
+  const { createStore, patch } = await import("./core.js");
 
   test("formField syncs string value", () => {
     const store = createStore({ name: "Alice" });
     const props = formField(store, "name", "value");
     const input = document.createElement("input");
+    const unsubscribe = props.ref(input);
+    expect(input.value).toBe("Alice");
+    update(store, ["name", "Bob"]);
+    expect(input.value).toBe("Bob");
+    input.value = "Charlie";
+    // biome-ignore lint/suspicious/noExplicitAny: for testing
+    (props as any).onChange({ target: input });
+    expect(peek(store, "name")).toBe("Charlie");
+    unsubscribe?.();
+  });
+
+  test.for(["input", "select", "textarea"] as const)("formText with %s element", (element) => {
+    const store = createStore({ name: "Alice" });
+    const props = formText(store, "name");
+    const input = document.createElement(element);
+    if (element === "select") {
+      for (const option of ["Alice", "Bob", "Charlie"]) {
+        const opt = document.createElement("option");
+        opt.value = option;
+        input.appendChild(opt);
+      }
+    }
     const unsubscribe = props.ref(input);
     expect(input.value).toBe("Alice");
     update(store, ["name", "Bob"]);
@@ -147,7 +211,7 @@ if (import.meta.vitest) {
     input.type = "checkbox";
     const unsubscribe = props.ref(input);
     expect(input.checked).toBe(false);
-    update(store, { subscribed: true });
+    patch(store, { subscribed: true });
     expect(input.checked).toBe(true);
     input.checked = false;
     // biome-ignore lint/suspicious/noExplicitAny: for testing
@@ -168,7 +232,7 @@ if (import.meta.vitest) {
     const unsubscribeBlue = propsBlue.ref(inputBlue);
     expect(inputRed.checked).toBe(true);
     expect(inputBlue.checked).toBe(false);
-    update(store, { color: "blue" });
+    patch(store, { color: "blue" });
     expect(inputRed.checked).toBe(false);
     expect(inputBlue.checked).toBe(true);
     inputRed.checked = true;

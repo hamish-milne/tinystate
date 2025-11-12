@@ -6,7 +6,6 @@ import {
   type Key,
   listen,
   peek,
-  replace,
   type Store,
   update,
 } from "./core.js";
@@ -42,7 +41,7 @@ export function useSignalStore<T extends AnyState>(
 /* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
-  const { createStore } = await import("./core.js");
+  const { createStore, patch } = await import("./core.js");
   const { render } = await import("@testing-library/preact");
   const { h } = await import("preact");
 
@@ -62,12 +61,12 @@ if (import.meta.vitest) {
     if (countSignal === undefined) return;
     expect(countSignal).toBe(countSignal2);
     expect(countSignal.value).toBe(0);
-    replace(store, { count: 5 });
+    patch(store, { count: 5 });
     expect(countSignal.value).toBe(5);
     countSignal.value = 10;
     expect(peek(store, "count")).toBe(10);
     result.unmount();
-    update(store, { count: 15 });
+    patch(store, { count: 15 });
     expect(countSignal.value).toBe(10); // should not update after unmount
   });
 }

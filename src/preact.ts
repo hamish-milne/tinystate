@@ -6,7 +6,6 @@ import {
   type KeyOf,
   listen,
   peek,
-  replace,
   type Store,
   type StoreView,
   update,
@@ -85,7 +84,7 @@ export function useStoreState<T extends AnyState, P extends GenericKeyOf<T>>(
 /* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
-  const { createStore } = await import("./core.js");
+  const { createStore, patch } = await import("./core.js");
   const { render, act } = await import("@testing-library/preact");
   const { h } = await import("preact");
 
@@ -122,7 +121,7 @@ if (import.meta.vitest) {
       return null;
     });
     expect(renderedValue).toBe(0);
-    act(() => replace(store, { count: 42 }));
+    act(() => patch(store, { count: 42 }));
     expect(renderedValue).toBe(42);
   });
 
@@ -138,7 +137,7 @@ if (import.meta.vitest) {
       return null;
     });
     expect(renderedValue).toBe(2);
-    act(() => update(store, { count: 3 }));
+    act(() => patch(store, { count: 3 }));
     expect(renderedValue).toBe(6);
   });
 

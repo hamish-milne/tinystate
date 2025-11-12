@@ -170,7 +170,7 @@ export function createStore<T extends StateValue>(initialState: T): Store<PathMa
     prefix: "",
   });
   const storeImpl = Object.preventExtensions<StoreImpl>({
-    _state: patchStateValue(null, "", initialState, null, null, false),
+    _state: patchStateValue(null, "", initialState, null),
     _listeners: new Map(),
   });
   implMap.set(store, storeImpl);
@@ -263,12 +263,9 @@ export function computed<T extends AnyState, P extends KeyOf<T>, V extends AnySt
   computeFn: (stateValue: T[P]) => V,
 ): StoreView<V> {
   const derived = createStore(computeFn(peek(store, path)));
-  listen(store, path, (newValue) => replace(derived, computeFn(newValue)));
+  listen(store, path, (newValue) => patch(derived, computeFn(newValue)));
   return derived;
 }
-
-// Tracks objects that are safe to merge without cloning
-const isSafeObject = new WeakSet<StateObject | StateArray>();
 
 type PatchStack = [
   current: StateValue,
@@ -277,7 +274,6 @@ type PatchStack = [
   key: string,
   keys: string[] | null,
   changes: [string, StateValue][],
-  merge: boolean,
 ][];
 
 function patchStateValue(
@@ -285,32 +281,21 @@ function patchStateValue(
   selector: Key,
   patch: StateValue,
   notify: Map<Key, StateValue> | null,
-  listeners: Map<Key, unknown> | null,
-  mergeInput: boolean,
 ): StateValue {
   // Setup the stack: add initial descent steps for each segment in the selector
-  // We set `keys` to empty and `merge` to true, ensuring that the top-level change is always merged
-  const stack: PatchStack = [[state, undefined, "", "", [], [], true]];
+  // We set `keys` to empty so that parent elements are never iterated-over
+  const stack: PatchStack = [[state, undefined, "", "", [], []]];
   for (const segment of segments(selector)) {
     const [current, _, path] = stack[stack.length - 1];
-    stack.push([
-      index(current, segment),
-      undefined,
-      concatPath(path, segment),
-      segment,
-      [],
-      [],
-      true,
-    ]);
+    stack.push([index(current, segment), undefined, concatPath(path, segment), segment, [], []]);
   }
-  // Set the patch value at the bottom of the stack, allowing it to merge or replace as needed
+  // Set the patch value at the bottom of the stack to kick-off the patching process
   const lastStack = stack[stack.length - 1];
   lastStack[1] = patch;
   lastStack[4] = null;
-  lastStack[6] = mergeInput;
   const recursionCheck = new WeakSet();
   while (true) {
-    const [current, next, path, key, keys, changes, merge] = stack[stack.length - 1];
+    const [current, next, path, key, keys, changes] = stack[stack.length - 1];
     let newValue: StateValue;
     if (keys) {
       // If `keys` is not null, we are iterating over the keys of `next`, or have finished iterating
@@ -324,56 +309,34 @@ function patchStateValue(
           nextKey,
           null,
           [],
-          merge,
         ]);
         continue;
       }
       // Finished iterating over keys; check for changes
       if (changes.length > 0) {
-        let changeSet: Iterable<[string, StateValue]>;
-        let isArray: boolean;
-        if (merge) {
-          const oldEntries = current && typeof current === "object" ? Object.entries(current) : [];
-          if (Array.isArray(current)) {
-            oldEntries.push(["length", current.length]);
-          }
-          const changesMap = new Map(oldEntries);
-          for (const [k, v] of changes) {
-            if (v === null) {
-              changesMap.delete(k);
-            } else if (v !== undefined) {
-              changesMap.set(k, v);
-            }
-          }
-          changeSet = changesMap;
-          isArray = typeof changesMap.get("length") === "number";
-        } else {
-          changeSet = changes;
-          isArray = Array.isArray(next);
+        const oldEntries = current && typeof current === "object" ? Object.entries(current) : [];
+        if (Array.isArray(current)) {
+          oldEntries.push(["length", current.length]);
         }
-        const newObj = Object.fromEntries(changeSet);
-        newValue = Object.freeze(isArray ? Object.assign([], newObj) : newObj);
-        isSafeObject.add(newValue);
+        const changesMap = new Map(oldEntries);
+        for (const [k, v] of changes) {
+          if (v === null) {
+            changesMap.delete(k);
+          } else if (v !== undefined) {
+            changesMap.set(k, v);
+          }
+        }
+        const newObj = Object.fromEntries(changesMap);
+        newValue = Object.freeze(
+          typeof newObj.length === "number" ? Object.assign([], newObj) : newObj,
+        );
       }
-      // If no changes, `nextValue` remains undefined
+      // If no changes, keep the current value
     } else if (current === next) {
       // No changes
     } else if (typeof next !== "object" || !next) {
       newValue = next;
-    } else if (!merge && isSafeObject.has(next)) {
-      newValue = next;
-      // If replacing an object with another 'safe' object, we can skip merging and use the new object directly
-      // But we need to manually notify sub-listeners of the change
-      if (listeners && notify) {
-        const listenerPrefix = `${path}.`;
-        for (const listenKey of listeners.keys()) {
-          if (typeof listenKey === "string" && listenKey.startsWith(listenerPrefix)) {
-            const subPath = listenKey.slice(listenerPrefix.length);
-            const subValue = deepIndex(newValue, subPath);
-            notify.set(concatPath(path, subPath), subValue);
-          }
-        }
-      }
+      // Note that listeners of object keys will not be notified when a parent primitive changes
     } else {
       // We need to merge `current` and `next` by iterating over the keys of `next`
       if (recursionCheck.has(next)) {
@@ -413,15 +376,12 @@ function patchStore(
   path: Key,
   newValue: StateValue,
   notify: Map<Key, StateValue>,
-  merge: boolean,
 ) {
   storeImpl._state = patchStateValue(
     storeImpl._state,
     concatPath(store.prefix, path),
     newValue,
     notify,
-    storeImpl._listeners,
-    merge,
   );
 }
 
@@ -438,25 +398,6 @@ function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>) {
 }
 
 /**
- * Replaces the value at the root of the store's state.
- * @param store The Store object
- * @param newValue The new state value
- */
-export function replace<T extends AnyState>(store: Store<T>, newValue: T[""]): void {
-  const storeImpl = getImpl(store);
-  const notify = new Map<Key, StateValue>();
-  storeImpl._state = patchStateValue(
-    storeImpl._state,
-    store.prefix,
-    newValue,
-    notify,
-    storeImpl._listeners,
-    false,
-  );
-  notifyChange(storeImpl, notify);
-}
-
-/**
  * A tuple representing a path and its corresponding value in the store's state.
  * @example
  * ```ts
@@ -465,28 +406,20 @@ export function replace<T extends AnyState>(store: Store<T>, newValue: T[""]): v
  * // Result: ["foo", number] | ["bar", string]
  * ```
  */
-export type PathPair<T extends AnyState> = { [K in keyof T]: [K, T[K]] }[GenericKeyOf<T>];
+export type PathPair<T extends AnyState> = {
+  [K in keyof T]: [K, PatchValue<T[K]>];
+}[GenericKeyOf<T>];
 
 /**
  * Sets multiple values in the store's state in a single batch operation.
  * @param store The Store object
- * @param replacements The replacement objects or path-value pairs
+ * @param replacements Tuples of path-value pairs to set in the store
  */
-export function update<T extends AnyState>(
-  store: Store<T>,
-  ...replacements: ({ [K in keyof T]?: T[K] } | PathPair<T>)[]
-): void {
+export function update<T extends AnyState>(store: Store<T>, ...replacements: PathPair<T>[]): void {
   const storeImpl = getImpl(store);
   const notify = new Map<Key, StateValue>();
-  for (const replacement of replacements) {
-    if (Array.isArray(replacement)) {
-      const [path, value] = replacement;
-      patchStore(store, storeImpl, path, value, notify, false);
-    } else {
-      for (const key in replacement) {
-        patchStore(store, storeImpl, key, replacement[key], notify, false);
-      }
-    }
+  for (const [path, value] of replacements) {
+    patchStore(store, storeImpl, path, value, notify);
   }
   notifyChange(storeImpl, notify);
 }
@@ -498,6 +431,8 @@ type PatchSpec<T> = T extends Primitive
     ? { [_ in number]?: PatchSpec<T[number]> | null } | T
     : { [K in keyof T]?: PatchSpec<T[K]> | null };
 
+type PatchValue<T> = T | PatchSpec<T>;
+
 /**
  * Patches the value at the specified path in the store's state by merging the provided patch object.
  * `null` values in the patch object will delete the corresponding keys in the state, while `undefined` values will leave them unchanged.
@@ -505,14 +440,10 @@ type PatchSpec<T> = T extends Primitive
  * @param path The path to patch
  * @param patchValue The patch object to merge at the specified path
  */
-export function patch<T extends AnyState, P extends KeyOf<T>>(
-  store: Store<T>,
-  path: P,
-  patchValue: T[P] | PatchSpec<T[P]> | Partial<T[P]>,
-): void {
+export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValue<T[""]>): void {
   const storeImpl = getImpl(store);
   const notify = new Map<Key, StateValue>();
-  patchStore(store, storeImpl, path, patchValue as T[P], notify, true);
+  patchStore(store, storeImpl, "", patchValue, notify);
   notifyChange(storeImpl, notify);
 }
 
@@ -554,44 +485,37 @@ if (import.meta.vitest) {
 
   test("set state and get updated value", () => {
     const store = createStore({ a: 1, b: { c: 2 } });
-    update(store, { a: 10 });
+    update(store, ["a", 10]);
     update(store, ["b.c", 20]);
     expect(peek(store, "a")).toBe(10);
     expect(peek(store, "b.c")).toBe(20);
   });
 
-  test("replace object with missing keys", () => {
-    const store = createStore({ a: 1, b: { c: 2, d: 3 } as { c: number; d?: number } });
-    update(store, { b: { c: 20 } });
-    expect(peek(store, "b.c")).toBe(20);
-    expect(peek(store, "b.d")).toBeUndefined();
-  });
-
   test("patch primitive with object", () => {
     const store = createStore({ a: 1 as number | { b: number }, b: null as null | { c: number } });
-    patch(store, "a", { b: 2 });
+    patch(store, { a: { b: 2 } });
     expect(peek(store, "a.b")).toBe(2);
-    patch(store, "b", { c: 3 });
+    patch(store, { b: { c: 3 } });
     expect(peek(store, "b.c")).toBe(3);
   });
 
   test("patch state with partial object", () => {
     const store = createStore({ a: 1, b: { c: 2, d: 3 } });
-    patch(store, "b", { c: 20 });
+    patch(store, { b: { c: 20 } });
     expect(peek(store, "b.c")).toBe(20);
     expect(peek(store, "b.d")).toBe(3);
   });
 
   test("patch state with null to delete key", () => {
     const store = createStore({ a: 1, b: { c: 2, d: 3 } });
-    patch(store, "b", { d: null });
+    patch(store, { b: { d: null } });
     expect(peek(store, "b.c")).toBe(2);
     expect(peek(store, "b.d")).toBeUndefined();
   });
 
   test("patch array indexes", () => {
     const store = createStore({ arr: [1, 2, 3] });
-    patch(store, "arr", { 1: 20 });
+    patch(store, { arr: { 1: 20 } });
     expect(peek(store, "arr")).toEqual([1, 20, 3]);
   });
 
@@ -601,11 +525,13 @@ if (import.meta.vitest) {
     const listener2 = vi.fn();
     const unsubscribe1 = listen(store, "a", listener1);
     const unsubscribe2 = listen(store, "a.1", listener2);
-    update(store, { "a.1": 20 });
-    update(store, { "a.1": 20 });
+    update(store, ["a.1", 20]);
+    update(store, ["a.1", 20]);
+    update(store, ["a", [1, 20, 3]]);
     expect(listener1).toHaveBeenCalledWith([1, 20, 3], "a");
+    expect(listener1).toHaveBeenCalledTimes(1);
     expect(listener2).toHaveBeenCalledWith(20, "a.1");
-    update(store, { a: [2, 4, 6] });
+    patch(store, { a: [2, 4, 6] });
     expect(listener1).toHaveBeenCalledWith([2, 4, 6], "a");
     expect(listener2).toHaveBeenCalledWith(4, "a.1");
     unsubscribe1();
@@ -620,28 +546,26 @@ if (import.meta.vitest) {
     // biome-ignore lint/suspicious/noExplicitAny: for testing
     const obj: any = { b: 2 };
     obj.c = obj; // Create circular reference
-    expect(() => update(store, { a: obj })).toThrow('Circular reference detected at path "a.c"');
+    expect(() => update(store, ["a", obj])).toThrow('Circular reference detected at path "a.c"');
   });
 
   test("unchanged objects are ref-stable", () => {
     const store = createStore({ a: { b: 1 }, c: { b: 2 } });
     const obj1 = peek(store, "a");
     const obj2 = peek(store, "c");
-    patch(store, "a", { b: 1 }); // No actual change
+    patch(store, { a: { b: 1 } }); // No actual change
     expect(peek(store, "a")).toBe(obj1); // Same reference
-    update(store, { "c.b": 3 }); // Actual change
+    update(store, ["c.b", 3]); // Actual change
     expect(peek(store, "c")).not.toBe(obj2); // Different reference
-    update(store, { c: obj1 }); // Set to same as `a`
-    expect(peek(store, "c")).toBe(obj1); // Same reference as `a`
   });
 
   test("replacing object by reference notifies sub-listeners", () => {
     const store = createStore({ a: { b: 1 } });
     const obj = peek(store, "a");
-    update(store, { a: { b: 2 } }); // Force new object
+    patch(store, { a: { b: 2 } }); // Force new object
     const listener = vi.fn();
     listen(store, "a.b", listener);
-    update(store, { a: obj }); // Set back to original object
+    patch(store, { a: obj }); // Set back to original object
     expect(listener).toHaveBeenCalledWith(1, "a.b");
   });
 
@@ -650,11 +574,11 @@ if (import.meta.vitest) {
     const subStore = focus(store, "a");
     expect(peek(subStore, "b")).toBe(1);
     expect(peek(subStore, "c")).toBe(2);
-    update(subStore, { b: 10 });
+    patch(subStore, { b: 10 });
     expect(peek(store, "a.b")).toBe(10);
     const subSubStore = focus(subStore, "c");
     expect(peek(subSubStore, "")).toBe(2);
-    replace(subSubStore, 20);
+    patch(subSubStore, 20);
     expect(peek(store, "a.c")).toBe(20);
   });
 
@@ -676,12 +600,12 @@ if (import.meta.vitest) {
     listen(derived, "max", lMax);
     expect(peek(derived, "sum")).toBe(6);
     expect(peek(derived, "max")).toBe(3);
-    update(store, { 1: 5 });
+    patch(store, { 1: 5 });
     expect(peek(derived, "sum")).toBe(9);
     expect(peek(derived, "max")).toBe(5);
     expect(lSum).toHaveBeenCalledWith(9, "sum");
     expect(lMax).toHaveBeenCalledWith(5, "max");
-    patch(store, "", [-2, undefined, 6]);
+    patch(store, [-2, undefined, 6]);
     expect(lMax).toHaveBeenCalledWith(6, "max");
     expect(lSum).toBeCalledTimes(1); // sum didn't change
   });
@@ -695,10 +619,18 @@ if (import.meta.vitest) {
     const store = sync(getter, setter);
     expect(peek(store, "x")).toBe(1);
     expect(peek(store, "y")).toBe(2);
-    update(store, { x: 10 });
+    patch(store, { x: 10 });
     expect(externalValue.x).toBe(10);
     expect(externalValue.y).toBe(2);
-    replace(store, { x: 5, y: 15 });
+    patch(store, { x: 5, y: 15 });
     expect(externalValue).toEqual({ x: 5, y: 15 });
+  });
+
+  test("listen on root after partial update", () => {
+    const store = createStore([{ a: 1 }, { a: 2 }]);
+    const listener = vi.fn();
+    listen(store, "", listener);
+    patch(store, [...peek(store, ""), { a: 3 }]);
+    expect(listener).toHaveBeenCalledWith([{ a: 1 }, { a: 2 }, { a: 3 }], "");
   });
 }
