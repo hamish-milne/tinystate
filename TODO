@@ -9,6 +9,7 @@ Core:
     ✔ Derived/readonly store @done(25-11-11 17:16)
     ☐ Metadata store
     ☐ Deferred updates
+    ☐ 'by-ref' symbol
 Form:
     ✔ Field @done(25-11-10 23:18)
     ✔ Checkbox @done(25-11-10 23:18)
@@ -26,7 +27,7 @@ Admin:
     ✔ CI @done(25-11-10 23:27)
     ☐ NPM package
 Example app:
-    ☐ Basic 'todo' list
+    ✔ Basic 'todo' app @done(25-11-12 21:56)
     ☐ Storage back-ends
     ☐ Field validation
     ☐ Undo/redo

@@ -16,6 +16,9 @@
     "rules": {
       "correctness": {
         "noConstructorReturn": "off"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "off"
       }
     }
   },
