@@ -1,6 +1,7 @@
 import { createContext, type Provider, useCallback, useContext, useEffect, useState } from "react";
 import {
   type AnyState,
+  type GenericKeyOf,
   type KeyOf,
   listen,
   peek,
@@ -67,7 +68,7 @@ export function useWatch<T extends AnyState, P extends KeyOf<T>, V = T[P]>(
  * @param path The path in the store to bind to
  * @returns A tuple containing the current value and a setter function
  */
-export function useStoreState<T extends AnyState, P extends Exclude<keyof T, symbol>>(
+export function useStoreState<T extends AnyState, P extends GenericKeyOf<T>>(
   store: Store<T>,
   path: P,
 ) {

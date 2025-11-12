@@ -2,8 +2,8 @@ import { type Signal, signal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import {
   type AnyState,
+  type GenericKeyOf,
   type Key,
-  type KeyOf,
   listen,
   peek,
   replace,
@@ -13,7 +13,7 @@ import {
 
 export function useSignalStore<T extends AnyState>(
   store: Store<T>,
-): <P extends KeyOf<T>>(path: P) => Signal<T[P]> {
+): <P extends GenericKeyOf<T>>(path: P) => Signal<T[P]> {
   // biome-ignore lint/suspicious/noExplicitAny: avoid casting when getting from map
   const signalCache = useRef<[Map<Key, Signal<any>>, (() => void)[]]>([new Map(), []]);
   useEffect(() => () => {
@@ -21,7 +21,7 @@ export function useSignalStore<T extends AnyState>(
       unsubscribe();
     }
   });
-  return function useSignal<P extends KeyOf<T>>(path: P): Signal<T[P]> {
+  return function useSignal<P extends GenericKeyOf<T>>(path: P): Signal<T[P]> {
     const [cache, unsubscribes] = signalCache.current;
     const sig = cache.get(path);
     if (sig) {

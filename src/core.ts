@@ -12,7 +12,15 @@ type StateArray = readonly StateValue[];
  */
 export type Key = string | number;
 
-export type KeyOf<T> = Exclude<keyof T, symbol>;
+/**
+ * Helper type to get only the keys of `T` that are not symbols.
+ */
+export type KeyOf<T> = keyof T & Key;
+
+/**
+ * Workaround for the normal KeyOF<T> not working in certain generic contexts
+ */
+export type GenericKeyOf<T> = Exclude<keyof T, symbol>;
 
 type ConcatPrefix<Prefix extends Key, Suffix extends Key> = Prefix extends ""
   ? Suffix
@@ -448,12 +456,21 @@ export function replace<T extends AnyState>(store: Store<T>, newValue: T[""]): v
   notifyChange(storeImpl, notify);
 }
 
-type PathPair<T extends AnyState> = { [K in keyof T]: [K, T[K]] }[Exclude<keyof T, symbol>];
+/**
+ * A tuple representing a path and its corresponding value in the store's state.
+ * @example
+ * ```ts
+ * type State = { foo: number; bar: string };
+ * type Pair = PathPair<State>;
+ * // Result: ["foo", number] | ["bar", string]
+ * ```
+ */
+export type PathPair<T extends AnyState> = { [K in keyof T]: [K, T[K]] }[GenericKeyOf<T>];
 
 /**
  * Sets multiple values in the store's state in a single batch operation.
  * @param store The Store object
- * @param replacement An object where keys are paths and values are the new values to set
+ * @param replacements The replacement objects or path-value pairs
  */
 export function update<T extends AnyState>(
   store: Store<T>,
@@ -497,6 +514,23 @@ export function patch<T extends AnyState, P extends KeyOf<T>>(
   const notify = new Map<Key, StateValue>();
   patchStore(store, storeImpl, path, patchValue as T[P], notify, true);
   notifyChange(storeImpl, notify);
+}
+
+/**
+ * Creates a store that synchronizes its state with external getter and setter functions.
+ * @param getter Function to get the current value
+ * @param setter Function to set a new value
+ * @returns A Store object that syncs with the external source
+ */
+export function sync<T extends StateValue>(
+  getter: () => T,
+  setter: (value: T) => void,
+): Store<PathMap<"", T>> {
+  const store = createStore(getter());
+  listen(store, "", () => {
+    setter(peek(store, ""));
+  });
+  return store;
 }
 
 /* v8 ignore start -- @preserve */
@@ -650,5 +684,21 @@ if (import.meta.vitest) {
     patch(store, "", [-2, undefined, 6]);
     expect(lMax).toHaveBeenCalledWith(6, "max");
     expect(lSum).toBeCalledTimes(1); // sum didn't change
+  });
+
+  test("sync store with external getter/setter", () => {
+    let externalValue = { x: 1, y: 2 };
+    const getter = () => externalValue;
+    const setter = (val: typeof externalValue) => {
+      externalValue = val;
+    };
+    const store = sync(getter, setter);
+    expect(peek(store, "x")).toBe(1);
+    expect(peek(store, "y")).toBe(2);
+    update(store, { x: 10 });
+    expect(externalValue.x).toBe(10);
+    expect(externalValue.y).toBe(2);
+    replace(store, { x: 5, y: 15 });
+    expect(externalValue).toEqual({ x: 5, y: 15 });
   });
 }

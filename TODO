@@ -19,8 +19,8 @@ React/Preact:
     ✔ State hook @done(25-11-10 23:25)
     ✔ Preact signals @done(25-11-10 23:26)
 Misc:
-    ☐ 'sync' helper
-    ☐ LocalStorage helper
+    ✔ 'sync' helper @done(25-11-12 00:16)
+    ✔ LocalStorage helper @done(25-11-12 00:16)
     ☐ IndexedDB helper
 Admin:
     ✔ CI @done(25-11-10 23:27)
