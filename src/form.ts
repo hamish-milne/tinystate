@@ -1,4 +1,4 @@
-import { type Key, listen, peek, type Store, update } from "./core.js";
+import { listen, peek, type Store, update } from "./core.js";
 
 export type ValueProp = "value" | "valueAsNumber" | "valueAsDate";
 export type MethodProp = "onChange" | "onInput" | "onBlur";
@@ -22,7 +22,7 @@ function isInputElement(element: EventTarget | null): element is HTMLInputElemen
 export function formField<
   TValue extends ValueProp,
   T extends NonNullable<HTMLInputElement[TValue]>,
-  P extends Key,
+  P extends PropertyKey,
   TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
 >(
   store: Store<{ [_ in P]: T }>,
@@ -68,7 +68,7 @@ export function formField<
  */
 export function formText<
   T extends string,
-  P extends Key,
+  P extends PropertyKey,
   TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
 >(store: Store<{ [_ in P]: T }>, path: P, method: TMethod = "onChange" as TMethod) {
   return {
@@ -104,7 +104,7 @@ export function formText<
  * ```
  */
 export function formCheckbox<
-  P extends Key,
+  P extends PropertyKey,
   TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
 >(store: Store<{ [_ in P]: boolean }>, path: P, method: TMethod = "onChange" as TMethod) {
   return {
@@ -139,7 +139,7 @@ export function formCheckbox<
  * ```
  */
 export function formRadio<
-  P extends Key,
+  P extends PropertyKey,
   K extends string,
   TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
 >(store: Store<{ [_ in P]: K }>, path: P, option: K, method: TMethod = "onChange" as TMethod) {

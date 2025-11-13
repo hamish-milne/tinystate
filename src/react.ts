@@ -1,14 +1,5 @@
 import { createContext, type Provider, useCallback, useContext, useEffect, useState } from "react";
-import {
-  type AnyState,
-  type GenericKeyOf,
-  type KeyOf,
-  listen,
-  peek,
-  type Store,
-  type StoreView,
-  update,
-} from "./core.js";
+import { type AnyState, listen, peek, type Store, type StoreView, update } from "./core.js";
 
 // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
 const StoreContext = createContext<Store<any> | null>(null);
@@ -42,7 +33,7 @@ export type CalcFn<T, V = T> = (this: void, stateValue: T, prev: V | null) => V;
  * @param calc Optional calculation function to derive a value from the state. Remember to wrap in {@link useCallback} if needed.
  * @returns The current value at the specified path, or the calculated value
  */
-export function useWatch<T extends AnyState, P extends KeyOf<T>, V = T[P]>(
+export function useWatch<T extends AnyState, P extends keyof T, V = T[P]>(
   store: StoreView<T>,
   path: P,
   calc?: (this: void, stateValue: T[P], prev: V | null) => V,
@@ -67,10 +58,7 @@ export function useWatch<T extends AnyState, P extends KeyOf<T>, V = T[P]>(
  * @param path The path in the store to bind to
  * @returns A tuple containing the current value and a setter function
  */
-export function useStoreState<T extends AnyState, P extends GenericKeyOf<T>>(
-  store: Store<T>,
-  path: P,
-) {
+export function useStoreState<T extends AnyState, P extends keyof T>(store: Store<T>, path: P) {
   const value = useWatch(store, path);
   const setStateValue = useCallback(
     (newValue: T[P]) => update(store, [path, newValue]),

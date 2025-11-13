@@ -4,27 +4,16 @@ type Primitive = string | number | boolean | null | undefined;
  * A value that can be stored in the state: a primitive, a readonly object of `StateValue`s, or a readonly array of `StateValue`s.
  */
 export type StateValue = Primitive | StateObject | StateArray;
-type StateObject = { readonly [key in Key]?: StateValue };
+type StateObject = { readonly [key in string | number]?: StateValue };
 type StateArray = readonly StateValue[];
 
-/**
- * A supported key type for state paths.
- */
-export type Key = string | number;
+type Stringify<T> = T extends symbol ? never : T;
 
-/**
- * Helper type to get only the keys of `T` that are not symbols.
- */
-export type KeyOf<T> = keyof T & Key;
-
-/**
- * Workaround for the normal KeyOF<T> not working in certain generic contexts
- */
-export type GenericKeyOf<T> = Exclude<keyof T, symbol>;
-
-type ConcatPrefix<Prefix extends Key, Suffix extends Key> = Prefix extends ""
+type ConcatPrefix<Prefix extends PropertyKey, Suffix extends PropertyKey> = Prefix extends ""
   ? Suffix
-  : `${Prefix}.${Suffix}`;
+  : Suffix extends ""
+    ? Prefix
+    : `${Stringify<Prefix>}.${Stringify<Suffix>}`;
 
 // Determines if `T` is recursive (i.e., contains itself as a property) to prevent infinite path expansion.
 // Note that this doesn't detect indirect recursion.
@@ -51,19 +40,40 @@ type UnionToIntersection<U> =
  * // }
  * ```
  */
-export type PathMap<Prefix extends Key, T> = true extends IsRecursive<T>
+export type PathMap<Prefix extends PropertyKey, T> = true extends IsRecursive<T>
   ? { "": T }
   : { [K in Prefix]: T } & _PathMap<Prefix, T>;
-type _PathMap<Prefix extends Key, T> = T extends Primitive
+type _PathMap<Prefix extends PropertyKey, T> = T extends Primitive
   ? // biome-ignore lint/complexity/noBannedTypes: we need a type with no keys here
     {}
   : T extends readonly unknown[]
     ? PathMap<ConcatPrefix<Prefix, number>, T[number]>
     : UnionToIntersection<
         {
-          [K in KeyOf<T>]: PathMap<ConcatPrefix<Prefix, K>, T[K]>;
-        }[KeyOf<T>]
+          [K in keyof T]: PathMap<ConcatPrefix<Prefix, K>, T[K]>;
+        }[keyof T]
       >;
+
+type _MetadataTree<
+  T extends AnyState,
+  M extends AnyState,
+  R extends AnyState,
+> = UnionToIntersection<
+  {
+    [KT in keyof T]: { [KM in keyof M as ConcatPrefix<KT, KM>]: M[KM] };
+  }[keyof T]
+> &
+  R;
+
+export type MetadataTree<
+  T extends StateValue,
+  M extends StateValue,
+  R extends StateValue,
+> = _MetadataTree<PathMap<"", T>, PathMap<"", M>, PathMap<"", R>>;
+
+// const x: MetadataTree<{ a: number; b: { c: string } }, { issue: string }, { invalidFields: string[] }> = {
+//   ''
+// }
 
 /**
  * A union of all possible paths in `T`.
@@ -74,7 +84,7 @@ type _PathMap<Prefix extends Key, T> = T extends Primitive
  * // Result: "foo" | "foo.bar" | "foo.baz" | `foo.baz.${number}` | "qux"
  * ```
  */
-export type PathOf<T> = PathMap<"", T>;
+export type PathOf<T> = keyof PathMap<"", T>;
 
 /**
  * The value type at path `P` in state type `T`.
@@ -86,14 +96,14 @@ export type PathOf<T> = PathMap<"", T>;
  * type QuxType = ValueOf<State, "qux">;       // Result: boolean
  * ```
  */
-export type ValueOf<T, P extends Key | undefined> = P extends keyof PathMap<"", T>
+export type ValueOf<T, P extends PropertyKey | undefined> = P extends keyof PathMap<"", T>
   ? PathMap<"", T>[P]
   : never;
 
 /**
  * A state object with any keys and values, as a fallback type.
  */
-export type AnyState = Partial<Record<Key, StateValue>>;
+export type AnyState = Partial<Record<PropertyKey, StateValue>>;
 
 // Unique brand to identify Store objects. In practice we check for presence in implMap,
 // but this symbol ensures type safety as well.
@@ -113,7 +123,7 @@ export interface StoreView<T = AnyState, Mutable extends boolean = boolean> {
   /**
    * The prefix path for this store (empty string for the root store)
    */
-  readonly prefix: Key;
+  readonly prefix: PropertyKey;
 }
 
 export type Store<T = AnyState> = StoreView<T, true>;
@@ -122,7 +132,7 @@ export type Store<T = AnyState> = StoreView<T, true>;
 interface StoreImpl {
   _state: StateValue;
   // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
-  readonly _listeners: Map<Key, Set<(value: any, path: any) => void>>;
+  readonly _listeners: Map<PropertyKey, Set<(value: any, path: any) => void>>;
 }
 
 // Maps Store objects to their implementations
@@ -134,11 +144,11 @@ function index(obj: StateValue, key: string): StateValue | undefined {
 }
 
 // Splits a path string into segments separated by dots, ignoring empty segments
-function segments(path: Key): string[] {
+function segments(path: PropertyKey): string[] {
   return String(path).match(/[^.]+/g) || [];
 }
 
-function deepIndex(obj: StateValue, path: Key): StateValue {
+function deepIndex(obj: StateValue, path: PropertyKey): StateValue {
   let result = obj;
   for (const segment of segments(path)) {
     result = index(result, segment);
@@ -147,8 +157,8 @@ function deepIndex(obj: StateValue, path: Key): StateValue {
 }
 
 // Concatenates a prefix and key into a dot-separated path
-function concatPath(prefix: Key, key: Key): Key {
-  return prefix !== "" ? `${prefix}.${key}` : key;
+function concatPath(prefix: PropertyKey, key: PropertyKey): PropertyKey {
+  return prefix !== "" ? `${prefix as string}.${key as string}` : key;
 }
 
 function getImpl(store: StoreView): StoreImpl {
@@ -201,7 +211,7 @@ export function isStore<T>(value: unknown): value is Store<T> {
  * @param path The path to retrieve
  * @returns The value at the specified path
  */
-export function peek<T extends AnyState, P extends KeyOf<T>>(store: StoreView<T>, path: P): T[P] {
+export function peek<T extends AnyState, P extends keyof T>(store: StoreView<T>, path: P): T[P] {
   return deepIndex(getImpl(store)._state, concatPath(store.prefix, path)) as T[P];
 }
 
@@ -212,7 +222,7 @@ export function peek<T extends AnyState, P extends KeyOf<T>>(store: StoreView<T>
  * @param listener The listener function to call on changes
  * @returns A function to unregister the listener
  */
-export function listen<T extends AnyState, P extends KeyOf<T>>(
+export function listen<T extends AnyState, P extends keyof T>(
   store: StoreView<T>,
   path: P,
   listener: (value: T[P], path: P) => void,
@@ -231,9 +241,15 @@ export function listen<T extends AnyState, P extends KeyOf<T>>(
 /**
  * Type that represents a sub-store focused on the state at the specified path prefix.
  */
-export type Focus<T extends Record<Key, StateValue>, P extends KeyOf<T>> = "" extends P
+export type Focus<T extends Record<PropertyKey, StateValue>, P extends keyof T> = "" extends P
   ? T
-  : { [K in keyof T as P extends K ? "" : K extends `${P}.${infer Rest}` ? Rest : never]: T[K] };
+  : {
+      [K in keyof T as P extends K
+        ? ""
+        : K extends `${Stringify<P>}.${infer Rest}`
+          ? Rest
+          : never]: T[K];
+    };
 
 /**
  * Creates a sub-store that focuses on the state at the specified path prefix.
@@ -241,10 +257,11 @@ export type Focus<T extends Record<Key, StateValue>, P extends KeyOf<T>> = "" ex
  * @param path The path prefix for the sub-store
  * @returns A new Store object representing the sub-store
  */
-export function focus<T extends Record<Key, StateValue>, P extends KeyOf<T>, M extends boolean>(
-  store: StoreView<T, M>,
-  path: P,
-): StoreView<Focus<T, P>, M> {
+export function focus<
+  T extends Record<PropertyKey, StateValue>,
+  P extends keyof T,
+  M extends boolean,
+>(store: StoreView<T, M>, path: P): StoreView<Focus<T, P>, M> {
   if (path === "") {
     return store as StoreView<Focus<T, P>, M>;
   }
@@ -257,7 +274,7 @@ export function focus<T extends Record<Key, StateValue>, P extends KeyOf<T>, M e
   return subStore;
 }
 
-export function computed<T extends AnyState, P extends KeyOf<T>, V extends AnyState>(
+export function computed<T extends AnyState, P extends keyof T, V extends AnyState>(
   store: StoreView<T>,
   path: P,
   computeFn: (stateValue: T[P]) => V,
@@ -270,7 +287,7 @@ export function computed<T extends AnyState, P extends KeyOf<T>, V extends AnySt
 type PatchStack = [
   current: StateValue,
   next: StateValue,
-  path: Key,
+  path: PropertyKey,
   key: string,
   keys: string[] | null,
   changes: [string, StateValue][],
@@ -278,9 +295,9 @@ type PatchStack = [
 
 function patchStateValue(
   state: StateValue,
-  selector: Key,
+  selector: PropertyKey,
   patch: StateValue,
-  notify: Map<Key, StateValue> | null,
+  notify: Map<PropertyKey, StateValue> | null,
 ): StateValue {
   // Setup the stack: add initial descent steps for each segment in the selector
   // We set `keys` to empty so that parent elements are never iterated-over
@@ -340,7 +357,7 @@ function patchStateValue(
     } else {
       // We need to merge `current` and `next` by iterating over the keys of `next`
       if (recursionCheck.has(next)) {
-        throw new Error(`Circular reference detected at path "${path}"`);
+        throw new Error(`Circular reference detected at path "${path as string}"`);
       }
       recursionCheck.add(next);
       const keys = Object.keys(next).reverse();
@@ -373,9 +390,9 @@ function patchStateValue(
 function patchStore(
   store: Store,
   storeImpl: StoreImpl,
-  path: Key,
+  path: PropertyKey,
   newValue: StateValue,
-  notify: Map<Key, StateValue>,
+  notify: Map<PropertyKey, StateValue>,
 ) {
   storeImpl._state = patchStateValue(
     storeImpl._state,
@@ -386,7 +403,7 @@ function patchStore(
 }
 
 // Notifies listeners of changes recorded in the `notify` map
-function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>) {
+function notifyChange(impl: StoreImpl, notify: Map<PropertyKey, StateValue>) {
   for (const [changedPath, value] of notify) {
     const listeners = impl._listeners.get(changedPath);
     if (listeners) {
@@ -407,8 +424,8 @@ function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>) {
  * ```
  */
 export type PathPair<T extends AnyState> = {
-  [K in keyof T]: [K, PatchValue<T[K]>];
-}[GenericKeyOf<T>];
+  [K in keyof T]: readonly [K, PatchValue<T[K]>];
+}[keyof T];
 
 /**
  * Sets multiple values in the store's state in a single batch operation.
@@ -417,7 +434,7 @@ export type PathPair<T extends AnyState> = {
  */
 export function update<T extends AnyState>(store: Store<T>, ...replacements: PathPair<T>[]): void {
   const storeImpl = getImpl(store);
-  const notify = new Map<Key, StateValue>();
+  const notify = new Map<PropertyKey, StateValue>();
   for (const [path, value] of replacements) {
     patchStore(store, storeImpl, path, value, notify);
   }
@@ -428,8 +445,8 @@ export function update<T extends AnyState>(store: Store<T>, ...replacements: Pat
 type PatchSpec<T> = T extends Primitive
   ? T
   : T extends readonly unknown[]
-    ? { [_ in number]?: PatchSpec<T[number]> | null } | T
-    : { [K in keyof T]?: PatchSpec<T[K]> | null };
+    ? { readonly [_ in number]?: PatchSpec<T[number]> | null } | T
+    : { readonly [K in keyof T]?: PatchSpec<T[K]> | null };
 
 type PatchValue<T> = T | PatchSpec<T>;
 
@@ -442,7 +459,7 @@ type PatchValue<T> = T | PatchSpec<T>;
  */
 export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValue<T[""]>): void {
   const storeImpl = getImpl(store);
-  const notify = new Map<Key, StateValue>();
+  const notify = new Map<PropertyKey, StateValue>();
   patchStore(store, storeImpl, "", patchValue, notify);
   notifyChange(storeImpl, notify);
 }

@@ -1,26 +1,18 @@
 import { type Signal, signal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
-import {
-  type AnyState,
-  type GenericKeyOf,
-  type Key,
-  listen,
-  peek,
-  type Store,
-  update,
-} from "./core.js";
+import { type AnyState, listen, peek, type Store, update } from "./core.js";
 
 export function useSignalStore<T extends AnyState>(
   store: Store<T>,
-): <P extends GenericKeyOf<T>>(path: P) => Signal<T[P]> {
+): <P extends keyof T>(path: P) => Signal<T[P]> {
   // biome-ignore lint/suspicious/noExplicitAny: avoid casting when getting from map
-  const signalCache = useRef<[Map<Key, Signal<any>>, (() => void)[]]>([new Map(), []]);
+  const signalCache = useRef<[Map<PropertyKey, Signal<any>>, (() => void)[]]>([new Map(), []]);
   useEffect(() => () => {
     for (const unsubscribe of signalCache.current[1]) {
       unsubscribe();
     }
   });
-  return function useSignal<P extends GenericKeyOf<T>>(path: P): Signal<T[P]> {
+  return function useSignal<P extends keyof T>(path: P): Signal<T[P]> {
     const [cache, unsubscribes] = signalCache.current;
     const sig = cache.get(path);
     if (sig) {
