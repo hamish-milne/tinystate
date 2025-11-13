@@ -4,6 +4,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.3.4",
     "@preact/signals": "^2.4.0",
+    "@standard-schema/spec": "^1.0.0",
     "@tailwindcss/vite": "^4.1.17",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/preact": "^3.2.4",
@@ -19,16 +20,21 @@
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.1.17",
     "typescript": "^5.9.3",
+    "valibot": "^1.1.0",
     "vite": "^7.2.2",
     "vitest": "^3.2.4"
   },
   "peerDependencies": {
     "@preact/signals": ">=2.0.0",
+    "@standard-schema/spec": ">=1.0.0",
     "preact": ">=10.0.0",
     "react": ">=18.0.0"
   },
   "peerDependenciesMeta": {
     "@preact/signals": {
+      "optional": true
+    },
+    "@standard-schema/spec": {
       "optional": true
     },
     "preact": {

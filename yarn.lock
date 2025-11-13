@@ -631,6 +631,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@standard-schema/spec@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "@standard-schema/spec@npm:1.0.0"
+  checksum: 10c0/a1ab9a8bdc09b5b47aa8365d0e0ec40cc2df6437be02853696a0e377321653b0d3ac6f079a8c67d5ddbe9821025584b1fb71d9cc041a6666a96f1fadf2ece15f
+  languageName: node
+  linkType: hard
+
 "@tailwindcss/node@npm:4.1.17":
   version: 4.1.17
   resolution: "@tailwindcss/node@npm:4.1.17"
@@ -1900,6 +1907,7 @@ __metadata:
   dependencies:
     "@biomejs/biome": "npm:^2.3.4"
     "@preact/signals": "npm:^2.4.0"
+    "@standard-schema/spec": "npm:^1.0.0"
     "@tailwindcss/vite": "npm:^4.1.17"
     "@testing-library/dom": "npm:^10.4.1"
     "@testing-library/preact": "npm:^3.2.4"
@@ -1915,14 +1923,18 @@ __metadata:
     react-dom: "npm:^19.2.0"
     tailwindcss: "npm:^4.1.17"
     typescript: "npm:^5.9.3"
+    valibot: "npm:^1.1.0"
     vite: "npm:^7.2.2"
     vitest: "npm:^3.2.4"
   peerDependencies:
     "@preact/signals": ">=2.0.0"
+    "@standard-schema/spec": ">=1.0.0"
     preact: ">=10.0.0"
     react: ">=18.0.0"
   peerDependenciesMeta:
     "@preact/signals":
+      optional: true
+    "@standard-schema/spec":
       optional: true
     preact:
       optional: true
@@ -2157,6 +2169,18 @@ __metadata:
   version: 6.21.0
   resolution: "undici-types@npm:6.21.0"
   checksum: 10c0/c01ed51829b10aa72fc3ce64b747f8e74ae9b60eafa19a7b46ef624403508a54c526ffab06a14a26b3120d055e1104d7abe7c9017e83ced038ea5cf52f8d5e04
+  languageName: node
+  linkType: hard
+
+"valibot@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "valibot@npm:1.1.0"
+  peerDependencies:
+    typescript: ">=5"
+  peerDependenciesMeta:
+    typescript:
+      optional: true
+  checksum: 10c0/39580b4e4683cc44398fb775e88c03639dbaa7e6f587df416125916cb6307292d45df18f656054e8846093ced13a2d2fdc98659da6dd104d1d20180edcbd99d4
   languageName: node
   linkType: hard
 

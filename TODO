@@ -7,7 +7,8 @@ Core:
     ✔ Patch state @done(25-11-10 23:18)
     ✔ Batch set state @done(25-11-11 21:58)
     ✔ Derived/readonly store @done(25-11-11 17:16)
-    ☐ Metadata store
+    ✔ Metadata store @done(25-11-13 22:58)
+    ✔ 'validate' function @done(25-11-13 22:58)
     ☐ Deferred updates
     ☐ 'by-ref' symbol
 Form:
