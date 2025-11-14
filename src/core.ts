@@ -40,17 +40,17 @@ type UnionToIntersection<U> =
  * // }
  * ```
  */
-export type PathMap<Prefix extends PropertyKey, T> = true extends IsRecursive<T>
+export type PathMap<T, Prefix extends PropertyKey = ""> = true extends IsRecursive<T>
   ? { "": T }
-  : { [K in Prefix]: T } & _PathMap<Prefix, T>;
-type _PathMap<Prefix extends PropertyKey, T> = T extends Primitive
+  : { [K in Prefix]: T } & _PathMap<T, Prefix>;
+type _PathMap<T, Prefix extends PropertyKey> = T extends Primitive
   ? // biome-ignore lint/complexity/noBannedTypes: we need a type with no keys here
     {}
   : T extends readonly unknown[]
-    ? PathMap<ConcatPrefix<Prefix, number>, T[number]>
+    ? PathMap<T[number], ConcatPrefix<Prefix, number>>
     : UnionToIntersection<
         {
-          [K in keyof T]: PathMap<ConcatPrefix<Prefix, K>, T[K]>;
+          [K in keyof T]: PathMap<T[K], ConcatPrefix<Prefix, K>>;
         }[keyof T]
       >;
 
@@ -69,7 +69,7 @@ export type MetadataTree<
   T extends StateValue,
   M extends StateValue,
   R extends StateValue,
-> = _MetadataTree<PathMap<"", T>, PathMap<"", M>, PathMap<"", R>>;
+> = _MetadataTree<PathMap<T>, PathMap<M>, PathMap<R>>;
 
 // const x: MetadataTree<{ a: number; b: { c: string } }, { issue: string }, { invalidFields: string[] }> = {
 //   ''
@@ -84,7 +84,7 @@ export type MetadataTree<
  * // Result: "foo" | "foo.bar" | "foo.baz" | `foo.baz.${number}` | "qux"
  * ```
  */
-export type PathOf<T> = keyof PathMap<"", T>;
+export type PathOf<T> = keyof PathMap<T>;
 
 /**
  * The value type at path `P` in state type `T`.
@@ -96,8 +96,8 @@ export type PathOf<T> = keyof PathMap<"", T>;
  * type QuxType = ValueOf<State, "qux">;       // Result: boolean
  * ```
  */
-export type ValueOf<T, P extends PropertyKey | undefined> = P extends keyof PathMap<"", T>
-  ? PathMap<"", T>[P]
+export type ValueOf<T, P extends PropertyKey | undefined> = P extends keyof PathMap<T>
+  ? PathMap<T>[P]
   : never;
 
 /**
@@ -179,7 +179,7 @@ function getImpl(store: StoreView): StoreImpl {
  * @param initialState The initial state value
  * @returns A new Store object
  */
-export function createStore<T extends StateValue>(initialState: T): Store<PathMap<"", T>> {
+export function createStore<T extends StateValue>(initialState: T): Store<PathMap<T>> {
   const store = Object.freeze<Store<T>>({
     [brand]: true,
     root: null,
@@ -476,7 +476,7 @@ export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValu
 export function sync<T extends StateValue>(
   getter: () => T,
   setter: (value: T) => void,
-): Store<PathMap<"", T>> {
+): Store<PathMap<T>> {
   const store = createStore(getter());
   listen(store, "", () => {
     setter(peek(store, ""));
