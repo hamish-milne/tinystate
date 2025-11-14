@@ -121,6 +121,11 @@ export interface StoreView<T = AnyState, Mutable extends boolean = boolean> {
   readonly [brand]: Mutable;
 
   /**
+   * The root store (null for the root store itself)
+   */
+  readonly root: StoreView | null;
+
+  /**
    * The prefix path for this store (empty string for the root store)
    */
   readonly prefix: PropertyKey;
@@ -162,7 +167,7 @@ function concatPath(prefix: PropertyKey, key: PropertyKey): PropertyKey {
 }
 
 function getImpl(store: StoreView): StoreImpl {
-  const storeImpl = implMap.get(store);
+  const storeImpl = implMap.get(store.root || store);
   if (!storeImpl) {
     throw new Error("Invalid store");
   }
@@ -177,6 +182,7 @@ function getImpl(store: StoreView): StoreImpl {
 export function createStore<T extends StateValue>(initialState: T): Store<PathMap<"", T>> {
   const store = Object.freeze<Store<T>>({
     [brand]: true,
+    root: null,
     prefix: "",
   });
   const storeImpl = Object.preventExtensions<StoreImpl>({
@@ -188,12 +194,11 @@ export function createStore<T extends StateValue>(initialState: T): Store<PathMa
 }
 
 /**
- * Destroys a store, cleaning up its resources. Future operations on the store will throw errors.
- * Note that this does not affect any focused sub-stores created from this store.
+ * Destroys a store and any sub-stores, cleaning up its resources. Future operations on the store will throw errors.
  * @param store The Store object to destroy
  */
 export function destroyStore(store: StoreView): void {
-  implMap.delete(store);
+  implMap.delete(store.root || store);
 }
 
 /**
@@ -265,13 +270,11 @@ export function focus<
   if (path === "") {
     return store as StoreView<Focus<T, P>, M>;
   }
-  const impl = getImpl(store);
-  const subStore = Object.freeze<StoreView<Focus<T, P>, M>>({
+  return Object.freeze<StoreView<Focus<T, P>, M>>({
     [brand]: store[brand],
+    root: store.root || store,
     prefix: concatPath(store.prefix, path),
   });
-  implMap.set(subStore, impl);
-  return subStore;
 }
 
 export function computed<T extends AnyState, P extends keyof T, V extends AnyState>(
