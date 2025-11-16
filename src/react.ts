@@ -1,26 +1,76 @@
-import { createContext, type Provider, useCallback, useContext, useEffect, useState } from "react";
-import { type AnyState, listen, peek, type Store, type StoreView, update } from "./core.js";
-
-// biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
-const StoreContext = createContext<Store<any> | null>(null);
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  type AnyState,
+  createStore,
+  focus,
+  isStore,
+  listen,
+  type PathOf,
+  peek,
+  type StateValue,
+  type Store,
+  type StoreOf,
+  type StoreView,
+  update,
+} from "./core.js";
 
 /**
- * The Provider component for supplying a Store to the React component tree.
+ * Hook to create and persist a Store instance.
+ * @param initialState Either: a Store, a function that returns a Store, or an initial state value
+ * @returns The Store instance
  */
-// biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
-export const StoreProvider: Provider<Store<any>> = StoreContext.Provider;
+export function useCreateStore<T extends StateValue>(
+  initialState: StoreOf<T> | T | (() => StoreOf<T>),
+): StoreOf<T> {
+  const store = useRef<StoreOf<T>>(null);
+  if (!store.current) {
+    store.current = isStore(initialState)
+      ? initialState
+      : typeof initialState === "function"
+        ? initialState()
+        : createStore(initialState);
+  }
+  return store.current;
+}
+
+// biome-ignore lint/suspicious/noEmptyInterface: used for augmentation
+export interface AppState {}
+
+type AppStore = StoreOf<AppState>;
+
+const StoreContext = createContext<AppStore | null>(null);
+
+/**
+ * The Provider component for supplying a Store to the component tree.
+ */
+export function StoreProvider(props: {
+  value: AppState | AppStore | (() => AppStore);
+  children: React.ReactNode;
+}) {
+  const { value, children } = props;
+  return createElement(StoreContext.Provider, { value: useCreateStore(value) }, children);
+}
 
 /**
  * Hook to access the Store from the React context.
  * @returns The Store object
  */
-export function useStore<T>(): Store<T> {
+export function useStore<P extends PathOf<AppState> = "">(path: P = "" as P) {
   const store = useContext(StoreContext);
   if (!store) {
     throw new Error("useStore() must be used within a StoreProvider");
   }
-  return store;
+  return focus(store, path);
 }
+
 /**
  * Calculation function type for useWatch
  */
@@ -33,9 +83,9 @@ export type CalcFn<T, V = T> = (this: void, stateValue: T, prev: V | null) => V;
  * @param calc Optional calculation function to derive a value from the state. Remember to wrap in {@link useCallback} if needed.
  * @returns The current value at the specified path, or the calculated value
  */
-export function useWatch<T extends AnyState, P extends keyof T, V = T[P]>(
+export function useWatch<T extends AnyState, P extends keyof T = "", V = T[P]>(
   store: StoreView<T>,
-  path: P,
+  path: P = "" as P,
   calc?: (this: void, stateValue: T[P], prev: V | null) => V,
 ): V {
   const [value, setValue] = useState(() => {
@@ -58,7 +108,10 @@ export function useWatch<T extends AnyState, P extends keyof T, V = T[P]>(
  * @param path The path in the store to bind to
  * @returns A tuple containing the current value and a setter function
  */
-export function useStoreState<T extends AnyState, P extends keyof T>(store: Store<T>, path: P) {
+export function useStoreState<T extends AnyState, P extends keyof T = "">(
+  store: Store<T>,
+  path: P = "" as P,
+) {
   const value = useWatch(store, path);
   const setStateValue = useCallback(
     (newValue: T[P]) => update(store, [path, newValue]),
@@ -75,14 +128,16 @@ if (import.meta.vitest) {
   const { createElement } = await import("react");
 
   function renderTestComponent(store: Store, component: () => null) {
-    return render(createElement(StoreProvider, { value: store }, createElement(component)));
+    return render(
+      createElement(StoreProvider, { value: store, children: createElement(component) }),
+    );
   }
 
   test("useStore and StoreProvider", () => {
     const store = createStore({ count: 0 });
     let usedStore: StoreView<{ count: number }> | null = null;
     renderTestComponent(store, () => {
-      usedStore = useStore<{ count: number }>();
+      usedStore = useStore();
       return null;
     });
     expect(usedStore).toBe(store);

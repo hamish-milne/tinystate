@@ -103,7 +103,7 @@ export type ValueOf<T, P extends PropertyKey | undefined> = P extends keyof Path
 /**
  * A state object with any keys and values, as a fallback type.
  */
-export type AnyState = Partial<Record<PropertyKey, StateValue>>;
+export type AnyState = Record<PropertyKey, StateValue>;
 
 // Unique brand to identify Store objects. In practice we check for presence in implMap,
 // but this symbol ensures type safety as well.
@@ -114,7 +114,7 @@ const brand = Symbol("Store");
  * @template T  The `PathMap` type representing the shape of the state in the store
  */
 // biome-ignore lint/correctness/noUnusedVariables: used for inference
-export interface StoreView<T = AnyState, Mutable extends boolean = boolean> {
+export interface StoreView<T extends AnyState = AnyState, Mutable extends boolean = boolean> {
   /**
    * Brand to identify Store objects
    */
@@ -131,7 +131,11 @@ export interface StoreView<T = AnyState, Mutable extends boolean = boolean> {
   readonly prefix: PropertyKey;
 }
 
-export type Store<T = AnyState> = StoreView<T, true>;
+export type Store<T extends AnyState = AnyState> = StoreView<T, true>;
+
+export type StoreViewOf<T extends StateValue> = StoreView<PathMap<T>>;
+
+export type StoreOf<T extends StateValue> = Store<PathMap<T>>;
 
 // Holds the actual mutable state and listeners for a Store
 interface StoreImpl {
@@ -180,7 +184,7 @@ function getImpl(store: StoreView): StoreImpl {
  * @returns A new Store object
  */
 export function createStore<T extends StateValue>(initialState: T): Store<PathMap<T>> {
-  const store = Object.freeze<Store<T>>({
+  const store = Object.freeze<Store<PathMap<T>>>({
     [brand]: true,
     root: null,
     prefix: "",
@@ -206,7 +210,7 @@ export function destroyStore(store: StoreView): void {
  * @param value The value to check
  * @returns True if the value is a Store, false otherwise
  */
-export function isStore<T>(value: unknown): value is Store<T> {
+export function isStore<T extends AnyState>(value: unknown): value is Store<T> {
   return implMap.has(value as StoreView);
 }
 
@@ -267,7 +271,7 @@ export function focus<
   P extends keyof T,
   M extends boolean,
 >(store: StoreView<T, M>, path: P): StoreView<Focus<T, P>, M> {
-  if (path === "") {
+  if (!path) {
     return store as StoreView<Focus<T, P>, M>;
   }
   return Object.freeze<StoreView<Focus<T, P>, M>>({
