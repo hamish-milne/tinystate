@@ -1,13 +1,14 @@
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
+import { analyzer } from "vite-bundle-analyzer";
 
 export default defineConfig({
-  plugins: [tailwindcss()],
+  plugins: [tailwindcss(), analyzer()],
   esbuild: {
     jsx: "automatic",
     jsxImportSource: "preact",
   },
-  server: {
-    hmr: false,
+  define: {
+    "import.meta.vitest": "undefined",
   },
 });

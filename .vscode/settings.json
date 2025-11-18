@@ -13,5 +13,5 @@
   "cSpell.ignorePaths": [".vscode/**", "yarn.lock"],
   "vitest.shellType": "child_process",
   "editor.defaultFormatter": "biomejs.biome",
-  "cSpell.words": ["preact"]
+  "cSpell.words": ["Numberify", "preact"]
 }

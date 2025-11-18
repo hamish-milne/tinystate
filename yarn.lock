@@ -1925,6 +1925,7 @@ __metadata:
     typescript: "npm:^5.9.3"
     valibot: "npm:^1.1.0"
     vite: "npm:^7.2.2"
+    vite-bundle-analyzer: "npm:^1.2.3"
     vitest: "npm:^3.2.4"
   peerDependencies:
     "@preact/signals": ">=2.0.0"
@@ -2181,6 +2182,15 @@ __metadata:
     typescript:
       optional: true
   checksum: 10c0/39580b4e4683cc44398fb775e88c03639dbaa7e6f587df416125916cb6307292d45df18f656054e8846093ced13a2d2fdc98659da6dd104d1d20180edcbd99d4
+  languageName: node
+  linkType: hard
+
+"vite-bundle-analyzer@npm:^1.2.3":
+  version: 1.2.3
+  resolution: "vite-bundle-analyzer@npm:1.2.3"
+  bin:
+    analyze: dist/bin.js
+  checksum: 10c0/e99c49cde7ec57ca6f70f02faa4bd96f0ed43da7a98b86b9e129b99e65c29eba7fec9fefa2bb3d8fd24db5bd0988258ae213cd70978cf3894905118b9eedb495
   languageName: node
   linkType: hard
 
