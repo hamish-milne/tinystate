@@ -11,7 +11,6 @@
     "module": "node18",
     "moduleResolution": "node16",
     "lib": ["es2019", "dom"],
-    "jsx": "preserve",
     "types": ["vitest/importMeta"],
     "emitDeclarationOnly": true,
     "declaration": true,
