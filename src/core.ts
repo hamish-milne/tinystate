@@ -246,6 +246,8 @@ export function listen<T extends AnyState, P extends keyof T>(
   return () => listeners.delete(listener);
 }
 
+type Numberify<T> = T extends `${number}` ? number : T;
+
 /**
  * Type that represents a sub-store focused on the state at the specified path prefix.
  */
@@ -255,7 +257,7 @@ export type Focus<T extends Record<PropertyKey, StateValue>, P extends keyof T> 
       [K in keyof T as P extends K
         ? ""
         : K extends `${Stringify<P>}.${infer Rest}`
-          ? Rest
+          ? Numberify<Rest>
           : never]: T[K];
     };
 
@@ -270,7 +272,7 @@ export function focus<
   P extends keyof T,
   M extends boolean,
 >(store: StoreView<T, M>, path: P): StoreView<Focus<T, P>, M> {
-  if (!path) {
+  if (path === "") {
     return store as StoreView<Focus<T, P>, M>;
   }
   return Object.freeze<StoreView<Focus<T, P>, M>>({
@@ -593,7 +595,7 @@ if (import.meta.vitest) {
   });
 
   test("focus creates sub-store", () => {
-    const store = createStore({ a: { b: 1, c: 2 }, d: 3 });
+    const store = createStore({ a: { b: 1, c: 2 }, d: [3] });
     const subStore = focus(store, "a");
     expect(peek(subStore, "b")).toBe(1);
     expect(peek(subStore, "c")).toBe(2);
@@ -603,6 +605,8 @@ if (import.meta.vitest) {
     expect(peek(subSubStore, "")).toBe(2);
     patch(subSubStore, 20);
     expect(peek(store, "a.c")).toBe(20);
+    const arrayStore = focus(store, "d");
+    expect(peek(focus(arrayStore, 0), "")).toBe(3);
   });
 
   test("focus with empty path returns same store", () => {
