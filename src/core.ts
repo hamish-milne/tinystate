@@ -47,7 +47,7 @@ type _PathMap<T, Prefix extends PropertyKey> = T extends Primitive
   ? // biome-ignore lint/complexity/noBannedTypes: we need a type with no keys here
     {}
   : T extends readonly unknown[]
-    ? PathMap<T[number], ConcatPrefix<Prefix, number>>
+    ? _PathMap<{ [_: number]: T[number]; length: number }, Prefix>
     : UnionToIntersection<
         {
           [K in keyof T]: PathMap<T[K], ConcatPrefix<Prefix, K>>;
@@ -113,12 +113,11 @@ const brand = Symbol("Store");
  * An opaque object that points to a state tree. These cannot be constructed directly; use {@link createStore} instead.
  * @template T  The `PathMap` type representing the shape of the state in the store
  */
-// biome-ignore lint/correctness/noUnusedVariables: used for inference
 export interface StoreView<T extends AnyState = AnyState, Mutable extends boolean = boolean> {
   /**
    * Brand to identify Store objects
    */
-  readonly [brand]: Mutable;
+  readonly [brand]: readonly [Mutable, T];
 
   /**
    * The root store (null for the root store itself)
@@ -185,7 +184,7 @@ function getImpl(store: StoreView): StoreImpl {
  */
 export function createStore<T extends StateValue>(initialState: T): Store<PathMap<T>> {
   const store = Object.freeze<Store<PathMap<T>>>({
-    [brand]: true,
+    [brand]: Object.freeze([true, null as unknown as PathMap<T>] as const),
     root: null,
     prefix: "",
   });
@@ -275,7 +274,7 @@ export function focus<
     return store as StoreView<Focus<T, P>, M>;
   }
   return Object.freeze<StoreView<Focus<T, P>, M>>({
-    [brand]: store[brand],
+    [brand]: store[brand] as [M, Focus<T, P>],
     root: store.root || store,
     prefix: concatPath(store.prefix, path),
   });
@@ -285,7 +284,7 @@ export function computed<T extends AnyState, P extends keyof T, V extends AnySta
   store: StoreView<T>,
   path: P,
   computeFn: (stateValue: T[P]) => V,
-): StoreView<V> {
+): StoreView<PathMap<V>> {
   const derived = createStore(computeFn(peek(store, path)));
   listen(store, path, (newValue) => patch(derived, computeFn(newValue)));
   return derived;
