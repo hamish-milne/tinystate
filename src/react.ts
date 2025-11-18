@@ -11,7 +11,6 @@ import {
   type AnyState,
   createStore,
   focus,
-  isStore,
   listen,
   type PathOf,
   peek,
@@ -32,11 +31,7 @@ export function useCreateStore<T extends StateValue>(
 ): StoreOf<T> {
   const store = useRef<StoreOf<T>>(null);
   if (!store.current) {
-    store.current = isStore(initialState)
-      ? initialState
-      : typeof initialState === "function"
-        ? initialState()
-        : createStore(initialState);
+    store.current = createStore(initialState);
   }
   return store.current;
 }

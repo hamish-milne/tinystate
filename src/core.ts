@@ -182,7 +182,15 @@ function getImpl(store: StoreView): StoreImpl {
  * @param initialState The initial state value
  * @returns A new Store object
  */
-export function createStore<T extends StateValue>(initialState: T): Store<PathMap<T>> {
+export function createStore<T extends StateValue>(
+  initialState: T | Store<PathMap<T>> | (() => Store<PathMap<T>>),
+): Store<PathMap<T>> {
+  if (isStore(initialState)) {
+    return initialState;
+  }
+  if (typeof initialState === "function") {
+    return initialState();
+  }
   const store = Object.freeze<Store<PathMap<T>>>({
     [brand]: Object.freeze([true, null as unknown as PathMap<T>] as const),
     root: null,
@@ -499,6 +507,12 @@ if (import.meta.vitest) {
     expect(peek(store, "b.c")).toBe(2);
     expect(isStore(store)).toBe(true);
     expect(isStore({})).toBe(false);
+  });
+
+  test("create store from existing store", () => {
+    const original = createStore({ a: 1 });
+    expect(createStore(original)).toBe(original);
+    expect(createStore(() => original)).toBe(original);
   });
 
   test("error after destroy", () => {
