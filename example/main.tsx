@@ -1,3 +1,6 @@
+/** @jsxRuntime automatic */
+/** @jsxImportSource preact */
+import "preact/debug";
 import { render } from "preact";
 import { TodoApp } from "./app";
 

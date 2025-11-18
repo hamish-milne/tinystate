@@ -31,6 +31,7 @@ export function formField<
   method: TMethod = "onChange" as TMethod,
 ) {
   return {
+    name: String(path),
     ref(node: HTMLInputElement | null) {
       if (node) {
         node[valueProp] = peek(store, path);
@@ -72,6 +73,7 @@ export function formText<
   TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
 >(store: Store<{ [_ in P]: T }>, path: P, method: TMethod = "onChange" as TMethod) {
   return {
+    name: String(path),
     ref(node: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) {
       if (node) {
         node.value = peek(store, path);
@@ -108,6 +110,7 @@ export function formCheckbox<
   TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
 >(store: Store<{ [_ in P]: boolean }>, path: P, method: TMethod = "onChange" as TMethod) {
   return {
+    name: String(path),
     ref(node: HTMLInputElement | null) {
       if (node) {
         node.checked = peek(store, path);
@@ -144,6 +147,7 @@ export function formRadio<
   TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
 >(store: Store<{ [_ in P]: K }>, path: P, option: K, method: TMethod = "onChange" as TMethod) {
   return {
+    name: String(path),
     ref(node: HTMLInputElement | null) {
       if (node) {
         node.checked = peek(store, path) === option;

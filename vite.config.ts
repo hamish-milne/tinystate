@@ -7,4 +7,7 @@ export default defineConfig({
     jsx: "automatic",
     jsxImportSource: "preact",
   },
+  server: {
+    hmr: false,
+  },
 });

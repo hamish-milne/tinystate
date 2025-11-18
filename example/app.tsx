@@ -1,5 +1,7 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource preact */
+
+import { memo } from "preact/compat";
 import { patch, peek } from "../src/core";
 import { formCheckbox, formField, formText } from "../src/form";
 import { useStore as $, StoreProvider, useWatch } from "../src/preact";
@@ -19,7 +21,7 @@ declare global {
   }
 }
 
-function TodoItem(props: { index: number }) {
+const TodoItem = memo(function TodoItem(props: { index: number }) {
   const { index } = props;
   const store = $(`todos.${index}`);
   const { priority, text, completed } = useWatch(store);
@@ -40,7 +42,7 @@ function TodoItem(props: { index: number }) {
       <span className={completed ? "line-through text-gray-500" : ""}>{text}</span>
     </li>
   );
-}
+});
 
 function TodoList() {
   const length = useWatch($(), "todos.length");
