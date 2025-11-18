@@ -59,7 +59,7 @@ export function StoreProvider(props: {
  * Hook to access the Store from the React context.
  * @returns The Store object
  */
-export function useStore<P extends PathOf<FixedAppState> = "">(path: P = "" as P) {
+export function useStore<P extends PathOf<FixedAppState>>(path: P) {
   const store = useContext(StoreContext);
   if (!store) {
     throw new Error("useStore() must be used within a StoreProvider");
@@ -79,9 +79,9 @@ export type CalcFn<T, V = T> = (this: void, stateValue: T, prev: V | null) => V;
  * @param calc Optional calculation function to derive a value from the state. Remember to wrap in {@link useCallback} if needed.
  * @returns The current value at the specified path, or the calculated value
  */
-export function useWatch<T extends AnyState, P extends keyof T = "", V = T[P]>(
+export function useWatch<T extends AnyState, P extends keyof T, V = T[P]>(
   store: StoreView<T>,
-  path: P = "" as P,
+  path: P,
   calc?: (this: void, stateValue: T[P], prev: V | null) => V,
 ): V {
   const [value, setValue] = useState(() => {
@@ -104,10 +104,7 @@ export function useWatch<T extends AnyState, P extends keyof T = "", V = T[P]>(
  * @param path The path in the store to bind to
  * @returns A tuple containing the current value and a setter function
  */
-export function useStoreState<T extends AnyState, P extends keyof T = "">(
-  store: Store<T>,
-  path: P = "" as P,
-) {
+export function useStoreState<T extends AnyState, P extends keyof T>(store: Store<T>, path: P) {
   const value = useWatch(store, path);
   const setStateValue = useCallback(
     (newValue: T[P]) => update(store, [path, newValue]),
@@ -133,7 +130,7 @@ if (import.meta.vitest) {
     const store = createStore({ count: 0 });
     let usedStore: StoreView<{ count: number }> | null = null;
     renderTestComponent(store, () => {
-      usedStore = useStore() as StoreView as StoreView<{ count: number }>;
+      usedStore = useStore("") as StoreView as StoreView<{ count: number }>;
       return null;
     });
     expect(usedStore).toBe(store);
@@ -143,7 +140,7 @@ if (import.meta.vitest) {
     expect(() =>
       render(
         createElement(() => {
-          useStore();
+          useStore("");
           return null;
         }, {}),
       ),
