@@ -34,10 +34,13 @@ export function useCreateStore<T extends StateValue>(
   return store.current;
 }
 
-// biome-ignore lint/suspicious/noEmptyInterface: used for augmentation
-export interface AppState {}
+declare global {
+  interface AppState {}
+}
 
-type AppStore = StoreOf<AppState>;
+type FixedAppState = { [K in keyof AppState]: AppState[K] };
+
+type AppStore = StoreOf<FixedAppState>;
 
 const StoreContext = createContext<AppStore | null>(null);
 
@@ -56,7 +59,7 @@ export function StoreProvider(props: {
  * Hook to access the Store from the React context.
  * @returns The Store object
  */
-export function useStore<P extends PathOf<AppState> = "">(path: P = "" as P) {
+export function useStore<P extends PathOf<FixedAppState> = "">(path: P = "" as P) {
   const store = useContext(StoreContext);
   if (!store) {
     throw new Error("useStore() must be used within a StoreProvider");
@@ -130,7 +133,7 @@ if (import.meta.vitest) {
     const store = createStore({ count: 0 });
     let usedStore: StoreView<{ count: number }> | null = null;
     renderTestComponent(store, () => {
-      usedStore = useStore();
+      usedStore = useStore() as StoreView as StoreView<{ count: number }>;
       return null;
     });
     expect(usedStore).toBe(store);
