@@ -2,7 +2,7 @@
 /** @jsxImportSource preact */
 
 import { memo } from "preact/compat";
-import { patch, peek } from "../src/core";
+import { focus, patch, peek } from "../src/core";
 import { formCheckbox, formField, formText } from "../src/form";
 import { useStore as $, StoreProvider, useWatch } from "../src/preact";
 import { webStorage } from "../src/utils";
@@ -23,7 +23,8 @@ declare global {
 
 const TodoItem = memo(function TodoItem(props: { index: number }) {
   const { index } = props;
-  const store = $(`todos.${index}`);
+  const list = $(`todos`);
+  const store = focus(list, index);
   const { priority, text, completed } = useWatch(store);
   return (
     <li className="mb-2 flex items-center">
@@ -39,7 +40,18 @@ const TodoItem = memo(function TodoItem(props: { index: number }) {
       >
         [{priority}]
       </span>
-      <span className={completed ? "line-through text-gray-500" : ""}>{text}</span>
+      <span className={`${completed ? "line-through text-gray-500" : ""} grow`}>{text}</span>
+      <button
+        type="button"
+        className="text-red-500 ml-2"
+        onClick={() => {
+          const array = [...peek(list, "")];
+          array.splice(index, 1);
+          patch(list, array);
+        }}
+      >
+        Delete
+      </button>
     </li>
   );
 });
@@ -57,6 +69,7 @@ function TodoList() {
 
 function NewTodoForm() {
   const store = $();
+  const addDisabled = useWatch(store, "newTodoText", (state) => state.trim() === "");
 
   return (
     <div className="flex mb-4">
@@ -74,7 +87,8 @@ function NewTodoForm() {
       </select>
       <button
         type="button"
-        className="bg-blue-500 text-white p-2"
+        disabled={addDisabled}
+        className="bg-blue-500 disabled:bg-gray-400 text-white p-2"
         onClick={() => {
           const {
             todos: { length },
