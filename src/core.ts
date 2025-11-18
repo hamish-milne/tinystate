@@ -9,7 +9,7 @@ type StateArray = readonly StateValue[];
 
 type Stringify<T> = T extends symbol ? never : T;
 
-type ConcatPrefix<Prefix extends PropertyKey, Suffix extends PropertyKey> = Prefix extends ""
+type ConcatPath<Prefix extends PropertyKey, Suffix extends PropertyKey> = Prefix extends ""
   ? Suffix
   : Suffix extends ""
     ? Prefix
@@ -50,7 +50,7 @@ type _PathMap<T, Prefix extends PropertyKey> = T extends Primitive
     ? _PathMap<{ [_: number]: T[number]; length: number }, Prefix>
     : UnionToIntersection<
         {
-          [K in keyof T]: PathMap<T[K], ConcatPrefix<Prefix, K>>;
+          [K in keyof T]: PathMap<T[K], ConcatPath<Prefix, K>>;
         }[keyof T]
       >;
 
@@ -60,7 +60,7 @@ type _MetadataTree<
   R extends AnyState,
 > = UnionToIntersection<
   {
-    [KT in keyof T]: { [KM in keyof M as ConcatPrefix<KT, KM>]: M[KM] };
+    [KT in keyof T]: { [KM in keyof M as ConcatPath<KT, KM>]: M[KM] };
   }[keyof T]
 > &
   R;
@@ -166,7 +166,7 @@ function deepIndex(obj: StateValue, path: PropertyKey): StateValue {
 
 // Concatenates a prefix and key into a dot-separated path
 function concatPath(prefix: PropertyKey, key: PropertyKey): PropertyKey {
-  return prefix !== "" ? `${prefix as string}.${key as string}` : key;
+  return prefix === "" ? key : key === "" ? prefix : `${prefix as string}.${key as string}`;
 }
 
 function getImpl(store: StoreView): StoreImpl {
@@ -546,7 +546,7 @@ if (import.meta.vitest) {
     const store = createStore({ a: [1, 2, 3] });
     const listener1 = vi.fn();
     const listener2 = vi.fn();
-    const unsubscribe1 = listen(store, "a", listener1);
+    const unsubscribe1 = listen(focus(store, "a"), "", listener1);
     const unsubscribe2 = listen(store, "a.1", listener2);
     update(store, ["a.1", 20]);
     update(store, ["a.1", 20]);
