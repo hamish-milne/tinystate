@@ -719,4 +719,9 @@ if (import.meta.vitest) {
     patch(store, [...peek(store, ""), { a: 3 }]);
     expect(listener).toHaveBeenCalledWith([{ a: 1 }, { a: 2 }, { a: 3 }], "");
   });
+
+  test("import index", async () => {
+    const module = await import("./index.js");
+    expect(module.createStore).toBeTypeOf("function");
+  });
 }
