@@ -227,7 +227,12 @@ export function isStore<T extends AnyState>(value: unknown): value is Store<T> {
  * @param path The path to retrieve
  * @returns The value at the specified path
  */
-export function peek<T extends AnyState, P extends keyof T>(store: StoreView<T>, path: P): T[P] {
+export function peek<T extends AnyState>(store: StoreView<T>): T[""];
+export function peek<T extends AnyState, P extends keyof T>(store: StoreView<T>, path: P): T[P];
+export function peek<T extends AnyState, P extends keyof T>(
+  store: StoreView<T>,
+  path: P = "" as P,
+): T[P] {
   return deepIndex(getImpl(store)._state, concatPath(store.prefix, path)) as T[P];
 }
 

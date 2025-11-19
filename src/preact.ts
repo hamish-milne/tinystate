@@ -3,8 +3,10 @@ import { useCallback, useContext, useEffect, useRef, useState } from "preact/hoo
 import {
   type AnyState,
   createStore,
+  type Focus,
   focus,
   listen,
+  type PathMap,
   type PathOf,
   peek,
   type StateValue,
@@ -54,7 +56,11 @@ export function StoreProvider(props: {
  * Hook to access the Store from the React context.
  * @returns The Store object
  */
-export function useStore<P extends PathOf<FixedAppState>>(path: P) {
+export function useStore(): AppStore;
+export function useStore<P extends PathOf<FixedAppState>>(
+  path: P,
+): Store<Focus<PathMap<FixedAppState>, P>>;
+export function useStore<P extends PathOf<FixedAppState>>(path: P = "" as P) {
   const store = useContext(StoreContext);
   if (!store) {
     throw new Error("useStore() must be used within a StoreProvider");
@@ -74,20 +80,24 @@ export type CalcFn<T, V = T> = (this: void, stateValue: T, prev: V | null) => V;
  * @param calc Optional calculation function to derive a value from the state. Remember to wrap in {@link useCallback} if needed.
  * @returns The current value at the specified path, or the calculated value
  */
-export function useWatch<T extends AnyState, P extends keyof T, V = T[P]>(
+export function useWatch<T extends AnyState>(store: StoreView<T>): T[""];
+export function useWatch<T extends AnyState, P extends keyof T>(store: StoreView<T>, path: P): T[P];
+export function useWatch<T extends AnyState, P extends keyof T, V>(
   store: StoreView<T>,
   path: P,
-  calc?: (this: void, stateValue: T[P], prev: V | null) => V,
+  calc: (this: void, stateValue: T[P], prev: V | null) => V,
+): V;
+export function useWatch<T extends AnyState, P extends keyof T, V>(
+  store: StoreView<T>,
+  path: P = "" as P,
+  calc: (this: void, stateValue: T[P], prev: V | null) => V = (x) => x as unknown as V,
 ): V {
   const [value, setValue] = useState(() => {
     const stateValue = peek(store, path);
-    return calc ? calc(stateValue, null) : (stateValue as unknown as V);
+    return calc(stateValue, null);
   });
   useEffect(
-    () =>
-      listen(store, path, (newValue) =>
-        setValue(calc ? (prev) => calc(newValue, prev) : (newValue as unknown as V)),
-      ),
+    () => listen(store, path, (newValue) => setValue((prev) => calc(newValue, prev))),
     [store, path, calc],
   );
   return value;
@@ -99,7 +109,17 @@ export function useWatch<T extends AnyState, P extends keyof T, V = T[P]>(
  * @param path The path in the store to bind to
  * @returns A tuple containing the current value and a setter function
  */
-export function useStoreState<T extends AnyState, P extends keyof T>(store: Store<T>, path: P) {
+export function useStoreState<T extends AnyState>(
+  store: Store<T>,
+): [T[""], (newValue: T[""]) => void];
+export function useStoreState<T extends AnyState, P extends keyof T>(
+  store: Store<T>,
+  path: P,
+): [T[P], (newValue: T[P]) => void];
+export function useStoreState<T extends AnyState, P extends keyof T>(
+  store: Store<T>,
+  path: P = "" as P,
+) {
   const value = useWatch(store, path);
   const setStateValue = useCallback(
     (newValue: T[P]) => update(store, [path, newValue]),

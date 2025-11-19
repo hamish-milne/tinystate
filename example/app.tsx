@@ -47,7 +47,7 @@ export function TodoApp() {
 }
 
 function TodoList() {
-  const length = useWatch(useStore(""), "todos.length");
+  const length = useWatch(useStore(), "todos.length");
   return (
     <ul className="mb-6 space-y-0">
       {Array.from({ length }).map((_, index) => (
@@ -61,7 +61,7 @@ const TodoItem = memo(function TodoItem(props: { index: number }) {
   const { index } = props;
   const list = useStore(`todos`);
   const store = focus(list, index);
-  const { priority, text, completed } = useWatch(store, "");
+  const { priority, text, completed } = useWatch(store);
   return (
     <li className="mb-3 p-3 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md flex items-center group">
       <input
@@ -86,7 +86,7 @@ const TodoItem = memo(function TodoItem(props: { index: number }) {
         type="button"
         className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-md opacity-0 group-hover:opacity-100"
         onClick={() => {
-          const array = [...peek(list, "")];
+          const array = [...peek(list)];
           array.splice(index, 1);
           patch(list, array);
         }}
@@ -101,7 +101,7 @@ const inputStyle =
   "border border-gray-300 rounded-md p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-400";
 
 function NewTodoForm() {
-  const store = useStore("");
+  const store = useStore();
 
   return (
     <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -125,7 +125,7 @@ function NewTodoForm() {
 }
 
 function AddTodoButton() {
-  const store = useStore("");
+  const store = useStore();
   const addDisabled = useWatch(store, "newTodoText", (state) => state.trim() === "");
 
   return (
@@ -138,7 +138,7 @@ function AddTodoButton() {
           todos: { length },
           newTodoText,
           newTodoPriority,
-        } = peek(store, "");
+        } = peek(store);
         patch(store, {
           todos: {
             [length]: {
