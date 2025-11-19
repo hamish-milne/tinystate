@@ -23,12 +23,12 @@ export function formField<
   TValue extends ValueProp,
   T extends NonNullable<HTMLInputElement[TValue]>,
   P extends PropertyKey,
-  TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
+  TMethod extends MethodProp | Lowercase<MethodProp> = "onchange",
 >(
   store: Store<{ [_ in P]: T }>,
   path: P,
   valueProp: TValue,
-  method: TMethod = "onChange" as TMethod,
+  method: TMethod = "onchange" as TMethod,
 ) {
   return {
     name: String(path),
@@ -70,8 +70,8 @@ export function formField<
 export function formText<
   T extends string,
   P extends PropertyKey,
-  TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
->(store: Store<{ [_ in P]: T }>, path: P, method: TMethod = "onChange" as TMethod) {
+  TMethod extends MethodProp | Lowercase<MethodProp> = "onchange",
+>(store: Store<{ [_ in P]: T }>, path: P, method: TMethod = "onchange" as TMethod) {
   return {
     name: String(path),
     ref(node: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) {
@@ -98,17 +98,13 @@ export function formText<
  * Creates props for a checkbox input that syncs with the store at the specified path.
  * @param store The Store object
  * @param path The path in the store to bind to
- * @param method The event method to listen for changes (default is "onChange")
  * @returns An object to be spread onto a checkbox input element
  * @example
  * ```tsx
  * <input type="checkbox" {...formCheckbox(store, "isSubscribed")} />
  * ```
  */
-export function formCheckbox<
-  P extends PropertyKey,
-  TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
->(store: Store<{ [_ in P]: boolean }>, path: P, method: TMethod = "onChange" as TMethod) {
+export function formCheckbox<P extends PropertyKey>(store: Store<{ [_ in P]: boolean }>, path: P) {
   return {
     name: String(path),
     ref(node: HTMLInputElement | null) {
@@ -119,7 +115,7 @@ export function formCheckbox<
         });
       }
     },
-    [method]({ target }: Event) {
+    onchange({ target }: Event) {
       if (isInputElement(target)) {
         update(store, [path, target.checked]);
       }
@@ -133,7 +129,6 @@ export function formCheckbox<
  * @param store The Store object
  * @param path The path in the store to bind to
  * @param option The option value for this radio button
- * @param method The event method to listen for changes (default is "onChange")
  * @returns An object to be spread onto a radio input element
  * @example
  * ```tsx
@@ -141,11 +136,11 @@ export function formCheckbox<
  * <input type="radio" {...formRadio(store, "favoriteColor", "blue")} /> Blue
  * ```
  */
-export function formRadio<
-  P extends PropertyKey,
-  K extends string,
-  TMethod extends MethodProp | Lowercase<MethodProp> = "onChange",
->(store: Store<{ [_ in P]: K }>, path: P, option: K, method: TMethod = "onChange" as TMethod) {
+export function formRadio<P extends PropertyKey, K extends string>(
+  store: Store<{ [_ in P]: K }>,
+  path: P,
+  option: K,
+) {
   return {
     name: String(path),
     ref(node: HTMLInputElement | null) {
@@ -156,7 +151,7 @@ export function formRadio<
         });
       }
     },
-    [method]({ target }: Event) {
+    onchange({ target }: Event) {
       if (isInputElement(target) && target.checked) {
         update(store, [path, option]);
       }
@@ -170,18 +165,19 @@ export function formRadio<
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
   const { createStore, patch } = await import("./core.js");
+  const { fireEvent } = await import("@testing-library/dom");
 
   test("formField syncs string value", () => {
     const store = createStore({ name: "Alice" });
     const props = formField(store, "name", "value");
     const input = document.createElement("input");
+    Object.assign(input, props);
     const unsubscribe = props.ref(input);
     expect(input.value).toBe("Alice");
     update(store, ["name", "Bob"]);
     expect(input.value).toBe("Bob");
     input.value = "Charlie";
-    // biome-ignore lint/suspicious/noExplicitAny: for testing
-    (props as any).onChange({ target: input });
+    fireEvent.change(input);
     expect(peek(store, "name")).toBe("Charlie");
     unsubscribe?.();
   });
@@ -197,41 +193,40 @@ if (import.meta.vitest) {
         input.appendChild(opt);
       }
     }
+    Object.assign(input, props);
     const unsubscribe = props.ref(input);
     expect(input.value).toBe("Alice");
     update(store, ["name", "Bob"]);
     expect(input.value).toBe("Bob");
     input.value = "Charlie";
-    // biome-ignore lint/suspicious/noExplicitAny: for testing
-    (props as any).onChange({ target: input });
+    fireEvent.change(input);
     expect(peek(store, "name")).toBe("Charlie");
     unsubscribe?.();
   });
 
   test("formCheckbox syncs boolean value", () => {
     const store = createStore({ subscribed: false as boolean });
-    const props = formCheckbox(store, "subscribed", "onChange");
+    const props = formCheckbox(store, "subscribed");
     const input = document.createElement("input");
-    input.type = "checkbox";
+    Object.assign(input, props);
     const unsubscribe = props.ref(input);
     expect(input.checked).toBe(false);
     patch(store, { subscribed: true });
     expect(input.checked).toBe(true);
     input.checked = false;
-    // biome-ignore lint/suspicious/noExplicitAny: for testing
-    (props as any).onChange({ target: input });
+    fireEvent.change(input);
     expect(peek(store, "subscribed")).toBe(false);
     unsubscribe?.();
   });
 
   test("formRadio syncs string value", () => {
     const store = createStore({ color: "red" as string });
-    const propsRed = formRadio(store, "color", "red", "onChange");
-    const propsBlue = formRadio(store, "color", "blue", "onChange");
+    const propsRed = formRadio(store, "color", "red");
+    const propsBlue = formRadio(store, "color", "blue");
     const inputRed = document.createElement("input");
-    inputRed.type = "radio";
+    Object.assign(inputRed, propsRed);
     const inputBlue = document.createElement("input");
-    inputBlue.type = "radio";
+    Object.assign(inputBlue, propsBlue);
     const unsubscribeRed = propsRed.ref(inputRed);
     const unsubscribeBlue = propsBlue.ref(inputBlue);
     expect(inputRed.checked).toBe(true);
@@ -240,8 +235,7 @@ if (import.meta.vitest) {
     expect(inputRed.checked).toBe(false);
     expect(inputBlue.checked).toBe(true);
     inputRed.checked = true;
-    // biome-ignore lint/suspicious/noExplicitAny: for testing
-    (propsRed as any).onChange({ target: inputRed });
+    fireEvent.change(inputRed);
     expect(peek(store, "color")).toBe("red");
     unsubscribeRed?.();
     unsubscribeBlue?.();
