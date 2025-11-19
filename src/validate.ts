@@ -1,16 +1,29 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import { type MetadataTree, type PathPair, type StateValue, type Store, update } from "./core.js";
 
+/**
+ * A PathMap representing the result of validating data against a schema.
+ */
 export type ValidationResult<T extends StateValue, V extends StateValue> = MetadataTree<
   T,
   { issue: string },
   { issueKeys: (keyof T extends symbol ? never : T)[]; validated: V | null }
 >;
 
+/**
+ * A Store containing validation metadata for a specific schema.
+ */
 export type ValidationStore<TSchema extends StandardSchemaV1<StateValue, StateValue>> = Store<
   ValidationResult<StandardSchemaV1.InferInput<TSchema>, StandardSchemaV1.InferOutput<TSchema>>
 >;
 
+/**
+ * Validates data against a schema and updates the metaStore with validation results.
+ * @param data The data to validate
+ * @param metaStore The Store to hold validation metadata
+ * @param schema The schema to validate against
+ * @returns The validated data if valid, otherwise undefined
+ */
 export async function validate<T extends StateValue, TResult extends StateValue>(
   data: T,
   metaStore: Store<ValidationResult<T, TResult>>,

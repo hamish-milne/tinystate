@@ -39,9 +39,15 @@ export function useCreateStore<T extends StateValue>(
 }
 
 declare global {
+  /**
+   * The global application state interface used by {@link StoreProvider} and {@link useStore}.
+   * This pattern allows you to define your application's state shape in a modular way, maintaining type safety across your application.
+   */
   interface AppState {}
 }
 
+// Because AppState is an interface, we need to create a mapped type to fix its index signature.
+// https://github.com/microsoft/TypeScript/issues/15300
 type FixedAppState = { [K in keyof AppState]: AppState[K] };
 
 type AppStore = StoreOf<FixedAppState>;

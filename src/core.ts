@@ -7,8 +7,11 @@ export type StateValue = Primitive | StateObject | StateArray;
 type StateObject = { readonly [key in string | number]?: StateValue };
 type StateArray = readonly StateValue[];
 
+// We don't support symbol keys, but 'pretending to' simplifies some type logic.
+// This helper filters out symbols where that's strictly necessary, such as in path stringification.
 type Stringify<T> = T extends symbol ? never : T;
 
+// Concatenates a prefix and suffix into a dot-separated path string.
 type ConcatPath<Prefix extends PropertyKey, Suffix extends PropertyKey> = Prefix extends ""
   ? Suffix
   : Suffix extends ""
@@ -47,13 +50,38 @@ type _PathMap<T, Prefix extends PropertyKey> = T extends Primitive
   ? // biome-ignore lint/complexity/noBannedTypes: we need a type with no keys here
     {}
   : T extends readonly unknown[]
-    ? _PathMap<{ [_: number]: T[number]; length: number }, Prefix>
+    ? _PathMap<{ [K in number | "length"]: T[K] }, Prefix>
     : UnionToIntersection<
         {
           [K in keyof T]: PathMap<T[K], ConcatPath<Prefix, K>>;
         }[keyof T]
       >;
 
+/**
+ * Creates a PathMap where metadata paths `M` are nested under each data path in `T`, merged with root-level metadata paths in `R`.
+ * This is useful for representing metadata associated with specific parts of the state tree, like field errors.
+ * @example
+ * ```ts
+ * type State = { user: { name: string; age: number }; settings: { theme: string } };
+ * type Meta = { issue: string };
+ * type RootMeta = { invalidFields: string[] };
+ * type Metadata = MetadataTree<State, Meta, RootMeta>;
+ * // Result:
+ * // {
+ * //   "user": { issue: string };
+ * //   "user.name": { issue: string };
+ * //   "user.age": { issue: string };
+ * //   "settings": { issue: string };
+ * //   "settings.theme": { issue: string };
+ * //   invalidFields: string[];
+ * // }
+ * ```
+ */
+export type MetadataTree<
+  T extends StateValue,
+  M extends StateValue,
+  R extends StateValue,
+> = _MetadataTree<PathMap<T>, PathMap<M>, PathMap<R>>;
 type _MetadataTree<
   T extends AnyState,
   M extends AnyState,
@@ -64,16 +92,6 @@ type _MetadataTree<
   }[keyof T]
 > &
   R;
-
-export type MetadataTree<
-  T extends StateValue,
-  M extends StateValue,
-  R extends StateValue,
-> = _MetadataTree<PathMap<T>, PathMap<M>, PathMap<R>>;
-
-// const x: MetadataTree<{ a: number; b: { c: string } }, { issue: string }, { invalidFields: string[] }> = {
-//   ''
-// }
 
 /**
  * A union of all possible paths in `T`.
@@ -112,10 +130,13 @@ const brand = Symbol("Store");
 /**
  * An opaque object that points to a state tree. These cannot be constructed directly; use {@link createStore} instead.
  * @template T  The `PathMap` type representing the shape of the state in the store
+ * @template Mutable  Whether the store is mutable (true) or read-only (false)
  */
 export interface StoreView<T extends AnyState = AnyState, Mutable extends boolean = boolean> {
   /**
-   * Brand to identify Store objects
+   * Brand to identify Store objects and ensure type safety
+   * Note that the real value will always be `[true, null]`, so you should not read this property at runtime.
+   * @internal
    */
   readonly [brand]: readonly [Mutable, T];
 
@@ -130,10 +151,19 @@ export interface StoreView<T extends AnyState = AnyState, Mutable extends boolea
   readonly prefix: PropertyKey;
 }
 
+/**
+ * A mutable Store object that points to a state tree. These cannot be constructed directly; use {@link createStore} instead.
+ */
 export type Store<T extends AnyState = AnyState> = StoreView<T, true>;
 
+/**
+ * A read-only StoreView object that points to a state tree.
+ */
 export type StoreViewOf<T extends StateValue> = StoreView<PathMap<T>>;
 
+/**
+ * A mutable Store object for state of type `T`.
+ */
 export type StoreOf<T extends StateValue> = Store<PathMap<T>>;
 
 // Holds the actual mutable state and listeners for a Store
@@ -224,7 +254,7 @@ export function isStore<T extends AnyState>(value: unknown): value is Store<T> {
 /**
  * Retrieves the value at the specified path in the store's state.
  * @param store The Store object
- * @param path The path to retrieve
+ * @param path The path to retrieve. If omitted, the entire state is returned.
  * @returns The value at the specified path
  */
 export function peek<T extends AnyState>(store: StoreView<T>): T[""];
@@ -295,6 +325,12 @@ export function focus<
   });
 }
 
+/**
+ * Creates a derived read-only store whose state is computed using the provided function whenever the value at the specified path changes.
+ * @param store The source StoreView object
+ * @param path The path in the source store to derive from
+ * @param computeFn The function to compute the derived state from the source state value
+ */
 export function computed<T extends AnyState, P extends keyof T, V extends AnyState>(
   store: StoreView<T>,
   path: P,
@@ -466,10 +502,14 @@ export function update<T extends AnyState>(store: Store<T>, ...replacements: Pat
 type PatchSpec<T> = T extends Primitive
   ? T
   : T extends readonly unknown[]
-    ? { readonly [_ in number]?: PatchSpec<T[number]> | null } | T
+    ? { readonly [K in number | "length"]?: PatchSpec<T[K]> | null } | T
     : { readonly [K in keyof T]?: PatchSpec<T[K]> | null };
 
-type PatchValue<T> = T | PatchSpec<T>;
+/**
+ * A value or patch specification for use with the `patch` function.
+ * The patch specification allows partial updates to objects and arrays, with `null` values indicating deletion of keys and `undefined` values indicating no change.
+ */
+export type PatchValue<T> = T | PatchSpec<T>;
 
 /**
  * Patches the value at the specified path in the store's state by merging the provided patch object.
