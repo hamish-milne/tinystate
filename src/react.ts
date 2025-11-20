@@ -110,7 +110,7 @@ export function useWatch<T extends AnyState, P extends keyof T, V>(
     return calc(stateValue, null);
   });
   useEffect(
-    () => listen(store, path, (newValue) => setValue((prev) => calc(newValue, prev))),
+    () => listen(store, path, (newValue) => setValue((prev) => calc(newValue, prev)), true),
     [store, path, calc],
   );
   return value;

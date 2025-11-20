@@ -1,4 +1,11 @@
-import { type ComponentChildren, createContext, createElement } from "preact";
+import {
+  type ComponentChildren,
+  createContext,
+  createElement,
+  Fragment,
+  type FunctionComponent,
+  type VNode,
+} from "preact";
 import { useCallback, useContext, useEffect, useRef, useState } from "preact/hooks";
 import {
   type AnyState,
@@ -13,6 +20,7 @@ import {
   type Store,
   type StoreOf,
   type StoreView,
+  type StoreViewOf,
   update,
 } from "./core.js";
 
@@ -21,10 +29,10 @@ import {
  * @param initialState Either: a Store, a function that returns a Store, or an initial state value
  * @returns The Store instance
  */
-export function useCreateStore<T extends StateValue>(
-  initialState: StoreOf<T> | T | (() => StoreOf<T>),
-): StoreOf<T> {
-  const store = useRef<StoreOf<T>>(null);
+export function useCreateStore<T extends StateValue, M extends boolean>(
+  initialState: StoreViewOf<T, M> | T | (() => StoreViewOf<T, M>),
+): StoreViewOf<T, M> {
+  const store = useRef<StoreViewOf<T, M>>(null);
   if (!store.current) {
     store.current = createStore(initialState);
   }
@@ -103,7 +111,7 @@ export function useWatch<T extends AnyState, P extends keyof T, V>(
     return calc(stateValue, null);
   });
   useEffect(
-    () => listen(store, path, (newValue) => setValue((prev) => calc(newValue, prev))),
+    () => listen(store, path, (newValue) => setValue((prev) => calc(newValue, prev)), true),
     [store, path, calc],
   );
   return value;
@@ -134,6 +142,41 @@ export function useStoreState<T extends AnyState, P extends keyof T>(
   return [value, setStateValue] as const;
 }
 
+type ItemProps<T extends StateValue, M extends boolean = boolean> = {
+  itemStore: StoreViewOf<T, M>;
+  index: number;
+};
+
+/**
+ * Component to efficiently render a list based on a Store array.
+ * @param props The component props
+ * @returns A Preact VNode containing the rendered list
+ */
+export function List<T extends StateValue, M extends boolean>(props: {
+  /**
+   * The StoreView containing an array to render.
+   */
+  store: StoreView<{ length: number } & PathMap<T, number>, M>;
+
+  /**
+   * The function component used to render each item in the list.
+   */
+  children: FunctionComponent<ItemProps<T, M>>;
+}) {
+  const { store, children } = props;
+  const { current: cache } = useRef<VNode<ItemProps<T, M>>[]>([]);
+  const length = useWatch(store, "length");
+
+  while (cache.length < length) {
+    const index = cache.length;
+    const itemStore = focus(store, index) as StoreViewOf<T, M>;
+    cache.push(createElement(children, { itemStore, index }));
+  }
+  cache.length = length;
+
+  return Fragment({ children: cache });
+}
+
 /* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
@@ -141,7 +184,8 @@ if (import.meta.vitest) {
   const { render, act } = await import("@testing-library/preact");
   const { createElement } = await import("preact");
 
-  function renderTestComponent(store: Store, component: () => null) {
+  // biome-ignore lint/suspicious/noExplicitAny: for testing
+  function renderTestComponent(store: Store, component: () => any) {
     return render(
       createElement(StoreProvider, { value: store, children: createElement(component, {}) }),
     );
@@ -208,5 +252,26 @@ if (import.meta.vitest) {
     expect(setCount).not.toBeUndefined();
     act(() => setCount?.(100));
     expect(renderedValue).toBe(100);
+  });
+
+  test("List renders items based on store array", () => {
+    const store = createStore({ items: ["a", "b"] });
+    let renderedItems: string[] = [];
+    function ItemComponent(props: ItemProps<string>) {
+      const { itemStore, index } = props;
+      const value = useWatch(itemStore);
+      console.log("Rendering item", index, value);
+      renderedItems.push(value);
+      return null;
+    }
+    renderTestComponent(store, () => {
+      // biome-ignore lint/suspicious/noExplicitAny: for testing
+      return createElement(List, { store: focus(store, "items"), children: ItemComponent as any });
+    });
+    expect(renderedItems).toEqual(["a", "b"]);
+    renderedItems = [];
+    act(() => patch(store, { items: ["x", "y", "z"] }));
+    renderedItems.sort();
+    expect(renderedItems).toEqual(["x", "y", "z"]);
   });
 }

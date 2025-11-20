@@ -32,12 +32,17 @@ export function formField<
 ) {
   return {
     name: String(path),
+    id: String(path),
     ref(node: HTMLInputElement | null) {
       if (node) {
-        node[valueProp] = peek(store, path);
-        return listen(store, path, (value) => {
-          node[valueProp] = value;
-        });
+        return listen(
+          store,
+          path,
+          (value) => {
+            node[valueProp] = value ?? "";
+          },
+          true,
+        );
       }
     },
     [method]({ target }: Event) {
@@ -74,12 +79,17 @@ export function formText<
 >(store: Store<{ [_ in P]: T }>, path: P, method: TMethod = "onchange" as TMethod) {
   return {
     name: String(path),
+    id: String(path),
     ref(node: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) {
       if (node) {
-        node.value = peek(store, path);
-        return listen(store, path, (value) => {
-          node.value = value;
-        });
+        return listen(
+          store,
+          path,
+          (value) => {
+            node.value = value ?? "";
+          },
+          true,
+        );
       }
     },
     [method]({ target }: Event) {
@@ -107,12 +117,17 @@ export function formText<
 export function formCheckbox<P extends PropertyKey>(store: Store<{ [_ in P]: boolean }>, path: P) {
   return {
     name: String(path),
+    id: String(path),
     ref(node: HTMLInputElement | null) {
       if (node) {
-        node.checked = peek(store, path);
-        return listen(store, path, (value) => {
-          node.checked = value;
-        });
+        return listen(
+          store,
+          path,
+          (value) => {
+            node.checked = value;
+          },
+          true,
+        );
       }
     },
     onchange({ target }: Event) {
@@ -143,12 +158,17 @@ export function formRadio<P extends PropertyKey, K extends string>(
 ) {
   return {
     name: String(path),
+    id: String(path),
     ref(node: HTMLInputElement | null) {
       if (node) {
-        node.checked = peek(store, path) === option;
-        return listen(store, path, (value) => {
-          node.checked = value === option;
-        });
+        return listen(
+          store,
+          path,
+          (value) => {
+            node.checked = value === option;
+          },
+          true,
+        );
       }
     },
     onchange({ target }: Event) {
@@ -158,6 +178,44 @@ export function formRadio<P extends PropertyKey, K extends string>(
     },
     value: option,
     type: "radio",
+  };
+}
+
+/**
+ * Creates props for a dialog element that syncs its open state with the store at the specified path.
+ * @param store The Store object
+ * @param path The path in the store to bind to
+ * @returns An object to be spread onto a dialog element
+ * @example
+ * ```tsx
+ * <dialog {...dialogModal(store, "isDialogOpen")}>
+ *   <p>This is a modal dialog.</p>
+ * </dialog>
+ * ```
+ */
+export function dialogModal<P extends PropertyKey>(store: Store<{ [_ in P]: boolean }>, path: P) {
+  return {
+    ref(node: HTMLDialogElement | null) {
+      if (node) {
+        return listen(
+          store,
+          path,
+          (value) => {
+            if (value) {
+              node.showModal();
+            } else {
+              node.close();
+            }
+          },
+          true,
+        );
+      }
+    },
+    onchange({ target }: Event) {
+      if (target instanceof HTMLDialogElement) {
+        update(store, [path, target.open]);
+      }
+    },
   };
 }
 
@@ -179,6 +237,8 @@ if (import.meta.vitest) {
     input.value = "Charlie";
     fireEvent.change(input);
     expect(peek(store, "name")).toBe("Charlie");
+    update(store, ["name", null as unknown as string]);
+    expect(input.value).toBe("");
     unsubscribe?.();
   });
 
@@ -201,6 +261,8 @@ if (import.meta.vitest) {
     input.value = "Charlie";
     fireEvent.change(input);
     expect(peek(store, "name")).toBe("Charlie");
+    update(store, ["name", null as unknown as string]);
+    expect(input.value).toBe("");
     unsubscribe?.();
   });
 
@@ -239,5 +301,20 @@ if (import.meta.vitest) {
     expect(peek(store, "color")).toBe("red");
     unsubscribeRed?.();
     unsubscribeBlue?.();
+  });
+
+  test("dialogModal syncs dialog open state", () => {
+    const store = createStore({ isOpen: false as boolean });
+    const props = dialogModal(store, "isOpen");
+    const dialog = document.createElement("dialog");
+    Object.assign(dialog, props);
+    const unsubscribe = props.ref(dialog);
+    expect(dialog.open).toBe(false);
+    patch(store, { isOpen: true });
+    expect(dialog.open).toBe(true);
+    dialog.close();
+    fireEvent.change(dialog);
+    expect(peek(store, "isOpen")).toBe(false);
+    unsubscribe?.();
   });
 }

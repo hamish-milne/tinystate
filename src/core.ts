@@ -44,7 +44,7 @@ type UnionToIntersection<U> =
  * ```
  */
 export type PathMap<T, Prefix extends PropertyKey = ""> = true extends IsRecursive<T>
-  ? { "": T }
+  ? { [K in Prefix]: T }
   : { [K in Prefix]: T } & _PathMap<T, Prefix>;
 type _PathMap<T, Prefix extends PropertyKey> = T extends Primitive
   ? // biome-ignore lint/complexity/noBannedTypes: we need a type with no keys here
@@ -159,7 +159,10 @@ export type Store<T extends AnyState = AnyState> = StoreView<T, true>;
 /**
  * A read-only StoreView object that points to a state tree.
  */
-export type StoreViewOf<T extends StateValue> = StoreView<PathMap<T>>;
+export type StoreViewOf<T extends StateValue, Mutable extends boolean = boolean> = StoreView<
+  PathMap<T>,
+  Mutable
+>;
 
 /**
  * A mutable Store object for state of type `T`.
@@ -212,17 +215,17 @@ function getImpl(store: StoreView): StoreImpl {
  * @param initialState The initial state value
  * @returns A new Store object
  */
-export function createStore<T extends StateValue>(
-  initialState: T | Store<PathMap<T>> | (() => Store<PathMap<T>>),
-): Store<PathMap<T>> {
-  if (isStore(initialState)) {
+export function createStore<T extends StateValue, M extends boolean = true>(
+  initialState: T | StoreViewOf<T, M> | (() => StoreViewOf<T, M>),
+): StoreViewOf<T, M> {
+  if (isStore<PathMap<T>, M>(initialState)) {
     return initialState;
   }
   if (typeof initialState === "function") {
     return initialState();
   }
-  const store = Object.freeze<Store<PathMap<T>>>({
-    [brand]: Object.freeze([true, null as unknown as PathMap<T>] as const),
+  const store = Object.freeze<StoreViewOf<T, M>>({
+    [brand]: Object.freeze([true as M, null as unknown as PathMap<T>] as const),
     root: null,
     prefix: "",
   });
@@ -247,7 +250,9 @@ export function destroyStore(store: StoreView): void {
  * @param value The value to check
  * @returns True if the value is a Store, false otherwise
  */
-export function isStore<T extends AnyState>(value: unknown): value is Store<T> {
+export function isStore<T extends AnyState, M extends boolean = true>(
+  value: unknown,
+): value is StoreView<T, M> {
   return implMap.has(value as StoreView);
 }
 
@@ -277,6 +282,7 @@ export function listen<T extends AnyState, P extends keyof T>(
   store: StoreView<T>,
   path: P,
   listener: (value: T[P], path: P) => void,
+  initialNotify = false,
 ): () => void {
   const impl = getImpl(store);
   const fullPath = concatPath(store.prefix, path);
@@ -286,6 +292,9 @@ export function listen<T extends AnyState, P extends keyof T>(
     impl._listeners.set(fullPath, listeners);
   }
   listeners.add(listener);
+  if (initialNotify) {
+    listener(peek(store, path), path);
+  }
   return () => listeners.delete(listener);
 }
 
@@ -331,13 +340,13 @@ export function focus<
  * @param path The path in the source store to derive from
  * @param computeFn The function to compute the derived state from the source state value
  */
-export function computed<T extends AnyState, P extends keyof T, V extends AnyState>(
+export function computed<T extends AnyState, P extends keyof T, V extends StateValue>(
   store: StoreView<T>,
   path: P,
   computeFn: (stateValue: T[P]) => V,
-): StoreView<PathMap<V>> {
-  const derived = createStore(computeFn(peek(store, path)));
-  listen(store, path, (newValue) => patch(derived, computeFn(newValue)));
+): StoreViewOf<V> {
+  const derived = createStore(undefined as unknown as V);
+  listen(store, path, (newValue) => patch(derived, computeFn(newValue)), true);
   return derived;
 }
 
@@ -526,12 +535,29 @@ export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValu
 }
 
 /**
- * Creates a store that synchronizes its state with external getter and setter functions.
+ * Synchronize an existing store with external getter and setter functions.
  * @param getter Function to get the current value
  * @param setter Function to set a new value
  * @returns A Store object that syncs with the external source
  */
 export function sync<T extends StateValue>(
+  store: Store<PathMap<T>>,
+  getter: () => T,
+  setter: (value: T) => void,
+) {
+  patch(store, getter());
+  return listen(store, "", () => {
+    setter(peek(store, ""));
+  });
+}
+
+/**
+ * Creates a store that synchronizes its state with external getter and setter functions.
+ * @param getter Function to get the current value
+ * @param setter Function to set a new value
+ * @returns A Store object that syncs with the external source
+ */
+export function createSync<T extends StateValue>(
   getter: () => T,
   setter: (value: T) => void,
 ): Store<PathMap<T>> {
@@ -702,7 +728,7 @@ if (import.meta.vitest) {
     const setter = (val: typeof externalValue) => {
       externalValue = val;
     };
-    const store = sync(getter, setter);
+    const store = createSync(getter, setter);
     expect(peek(store, "x")).toBe(1);
     expect(peek(store, "y")).toBe(2);
     patch(store, { x: 10 });
