@@ -1,3 +1,5 @@
+type Assert<Actual extends Expected, Expected> = Actual;
+
 type Primitive = string | number | boolean | null | undefined;
 
 /**
@@ -22,10 +24,61 @@ type ConcatPath<Prefix extends PropertyKey, Suffix extends PropertyKey> = Prefix
 // Note that this doesn't detect indirect recursion.
 type IsRecursive<T> = T extends Primitive ? false : T extends T[keyof T] ? true : false;
 
+type _Test_IsRecursive1 = Assert<
+  // biome-ignore lint/suspicious/noExplicitAny: for testing
+  IsRecursive<{ a: number; b: { c: string; d: { e: number; f: { g: any } } }; h: any }>,
+  true
+>;
+type _Test_IsRecursive2 = Assert<
+  IsRecursive<{ a: number; b: { c: string; d: { e: number } } }>,
+  false
+>;
+
 // Converts `A | B | C` to `A & B & C`
 type UnionToIntersection<U> =
   // biome-ignore lint/suspicious/noExplicitAny: type magic
   (U extends any ? (x: U) => void : never) extends (x: infer I) => void ? I : never;
+
+type _Test_UnionToIntersection = Assert<
+  UnionToIntersection<{ a: number } | { b: string } | { c: boolean }>,
+  { a: number } & { b: string } & { c: boolean }
+>;
+
+type AllKeys<T> = keyof {
+  [U in T as U extends readonly unknown[] ? Extract<keyof U, number | "length"> : keyof U]: unknown;
+};
+
+type OptionalKey<T, K extends PropertyKey> = T extends { [_ in K]?: infer P }
+  ? P
+  : Extract<T, { [_ in K]?: unknown }>[K] | undefined;
+
+type MergeUnionObject<T> = { readonly [K in AllKeys<T>]: OptionalKey<T, K> };
+
+type MergeUnion<T> = Extract<T, Primitive> extends never
+  ? MergeUnionObject<T>
+  : Partial<MergeUnionObject<Exclude<T, Primitive>>>;
+
+type _Test_MergeUnion1 = Assert<
+  MergeUnion<{ a: { x: number }; b: { y: string } } | { a: { z: boolean }; c: { w: number[] } }>,
+  { a: { x: number } | { z: boolean }; b?: { y: string }; c?: { w: number[] } }
+>;
+type _Test_MergeUnion2 = Assert<
+  MergeUnion<{ a: number } | { b: string } | { c: boolean }>,
+  { a?: number; b?: string; c?: boolean }
+>;
+type _Test_MergeUnion3 = Assert<MergeUnion<{ a: number } | { a: string }>, { a: number | string }>;
+type _Test_MergeUnion4 = Assert<
+  MergeUnion<{ a: number } | { a: string } | number>,
+  { a?: number | string }
+>;
+type _Test_MergeUnion5 = Assert<
+  MergeUnion<{ a: number } | { a: string } | [number, string] | [number, string, boolean]>,
+  { a?: number | string; 0?: number; 1?: string; 2?: boolean; length?: 2 | 3 }
+>;
+type _Test_MergeUnion6 = Assert<
+  MergeUnion<{ a: number | { b: number }; b: null | { c: number } }>,
+  { a: number | { b: number }; b: null | { c: number } }
+>;
 
 /**
  * A mapping of all possible paths in `T` to their corresponding value types.
@@ -45,17 +98,33 @@ type UnionToIntersection<U> =
  */
 export type PathMap<T, Prefix extends PropertyKey = ""> = true extends IsRecursive<T>
   ? { [K in Prefix]: T }
-  : { [K in Prefix]: T } & _PathMap<T, Prefix>;
-type _PathMap<T, Prefix extends PropertyKey> = T extends Primitive
-  ? // biome-ignore lint/complexity/noBannedTypes: we need a type with no keys here
-    {}
-  : T extends readonly unknown[]
-    ? _PathMap<{ [K in number | "length"]: T[K] }, Prefix>
-    : UnionToIntersection<
-        {
-          [K in keyof T]: PathMap<T[K], ConcatPath<Prefix, K>>;
-        }[keyof T]
-      >;
+  : { [K in Prefix]: T } & _PathMap<MergeUnion<T>, Prefix>;
+type _PathMap<T, Prefix extends PropertyKey> = UnionToIntersection<
+  {
+    [K in keyof T]-?: PathMap<T[K], ConcatPath<Prefix, K>>;
+  }[keyof T]
+>;
+
+type _Test_PathMap1 = Assert<
+  PathMap<{ foo: { bar: number; baz: string[] }; qux: boolean }>,
+  {
+    "": { foo: { bar: number; baz: string[] }; qux: boolean };
+    foo: { bar: number; baz: string[] };
+    "foo.bar": number;
+    "foo.baz": string[];
+    qux: boolean;
+  } & {
+    [_ in `foo.baz.${number}`]: string;
+  }
+>;
+type _Test_PathMap2 = Assert<
+  PathMap<{ a: number } | { b: string }>,
+  {
+    "": { a: number } | { b: string };
+    a: number | undefined;
+    b: string | undefined;
+  }
+>;
 
 /**
  * Creates a PathMap where metadata paths `M` are nested under each data path in `T`, merged with root-level metadata paths in `R`.
@@ -92,6 +161,22 @@ type _MetadataTree<
   }[keyof T]
 > &
   R;
+
+type _Test_MetadataTree = Assert<
+  MetadataTree<
+    { user: { name: string; age: number }; settings: { theme: string } },
+    { issue: string },
+    { invalidFields: string[] }
+  >,
+  {
+    user: { issue: string };
+    "user.name": { issue: string };
+    "user.age": { issue: string };
+    settings: { issue: string };
+    "settings.theme": { issue: string };
+    invalidFields: string[];
+  }
+>;
 
 /**
  * A union of all possible paths in `T`.
@@ -167,7 +252,7 @@ export type StoreViewOf<T extends StateValue, Mutable extends boolean = boolean>
 /**
  * A mutable Store object for state of type `T`.
  */
-export type StoreOf<T extends StateValue> = Store<PathMap<T>>;
+export type StoreOf<T extends StateValue> = StoreViewOf<T, true>;
 
 // Holds the actual mutable state and listeners for a Store
 interface StoreImpl {
@@ -212,17 +297,17 @@ function getImpl(store: StoreView): StoreImpl {
 
 /**
  * Creates a new state store with the given initial state.
- * @param initialState The initial state value
+ * @param factory The initial state value
  * @returns A new Store object
  */
 export function createStore<T extends StateValue, M extends boolean = true>(
-  initialState: T | StoreViewOf<T, M> | (() => StoreViewOf<T, M>),
+  factory: T | StoreViewOf<T, M> | (() => StoreViewOf<T, M>),
 ): StoreViewOf<T, M> {
-  if (isStore<PathMap<T>, M>(initialState)) {
-    return initialState;
+  if (isStore<PathMap<T>, M>(factory)) {
+    return factory;
   }
-  if (typeof initialState === "function") {
-    return initialState();
+  if (typeof factory === "function") {
+    return factory();
   }
   const store = Object.freeze<StoreViewOf<T, M>>({
     [brand]: Object.freeze([true as M, null as unknown as PathMap<T>] as const),
@@ -230,7 +315,7 @@ export function createStore<T extends StateValue, M extends boolean = true>(
     prefix: "",
   });
   const storeImpl = Object.preventExtensions<StoreImpl>({
-    _state: patchStateValue(null, "", initialState, null),
+    _state: patchStateValue(null, "", factory, null),
     _listeners: new Map(),
   });
   implMap.set(store, storeImpl);
@@ -345,7 +430,7 @@ export function computed<T extends AnyState, P extends keyof T, V extends StateV
   path: P,
   computeFn: (stateValue: T[P]) => V,
 ): StoreViewOf<V> {
-  const derived = createStore(undefined as unknown as V);
+  const derived = createStore<V>(undefined as unknown as V);
   listen(store, path, (newValue) => patch(derived, computeFn(newValue)), true);
   return derived;
 }
@@ -541,7 +626,7 @@ export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValu
  * @returns A Store object that syncs with the external source
  */
 export function sync<T extends StateValue>(
-  store: Store<PathMap<T>>,
+  store: StoreOf<T>,
   getter: () => T,
   setter: (value: T) => void,
 ) {
@@ -560,8 +645,8 @@ export function sync<T extends StateValue>(
 export function createSync<T extends StateValue>(
   getter: () => T,
   setter: (value: T) => void,
-): Store<PathMap<T>> {
-  const store = createStore(getter());
+): StoreOf<T> {
+  const store = createStore<T>(getter());
   listen(store, "", () => {
     setter(peek(store, ""));
   });
