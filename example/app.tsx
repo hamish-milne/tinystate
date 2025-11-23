@@ -1,10 +1,10 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource preact */
 
-import { focus, patch, peek } from "../src/core";
+import { createStore, focus, patch, peek } from "../src/core";
 import { formCheckbox, formField, formText } from "../src/form";
 import { StoreProvider, useStore, useWatch } from "../src/preact";
-import { createWebStorage } from "../src/utils";
+import { syncStorage } from "../src/utils";
 import { memo } from "../vendor/memo";
 
 type Priority = "low" | "medium" | "high";
@@ -21,19 +21,23 @@ declare global {
   }
 }
 
+const initialState: AppState = {
+  todos: [
+    { text: "Learn Preact", completed: false, priority: "high" },
+    { text: "Build a Todo App", completed: false, priority: "medium" },
+  ],
+  newTodoText: "",
+  newTodoPriority: "medium",
+} as unknown as Pick<AppState, keyof AppState>;
+
 export function TodoApp() {
   return (
     <StoreProvider
-      value={() =>
-        createWebStorage(localStorage, "todo-app", {
-          todos: [
-            { text: "Learn Preact", completed: false, priority: "high" },
-            { text: "Build a Todo App", completed: false, priority: "medium" },
-          ],
-          newTodoText: "",
-          newTodoPriority: "medium",
-        } as unknown as Pick<AppState, keyof AppState>)
-      }
+      value={() => {
+        const store = createStore<Pick<AppState, keyof AppState>>(initialState);
+        syncStorage(store, localStorage, "todo-app");
+        return store;
+      }}
     >
       <div className="min-h-screen bg-gray-50 py-8 **:transition-all **:duration-200">
         <div className="max-w-2xl mx-auto px-4">

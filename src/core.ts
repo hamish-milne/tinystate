@@ -48,15 +48,17 @@ type AllKeys<T> = keyof {
   [U in T as U extends readonly unknown[] ? Extract<keyof U, number | "length"> : keyof U]: unknown;
 };
 
-type OptionalKey<T, K extends PropertyKey> = T extends { [_ in K]?: infer P }
+type OptionalKey<T, K extends PropertyKey> = T extends { [_ in K]: infer P }
   ? P
   : Extract<T, { [_ in K]?: unknown }>[K] | undefined;
 
-type MergeUnionObject<T> = { readonly [K in AllKeys<T>]: OptionalKey<T, K> };
+type MergeUnionObject<T> = { [K in AllKeys<T>]: OptionalKey<T, K> };
+
+type OrUndefined<T> = { [K in keyof T]: T[K] | undefined };
 
 type MergeUnion<T> = Extract<T, Primitive> extends never
   ? MergeUnionObject<T>
-  : Partial<MergeUnionObject<Exclude<T, Primitive>>>;
+  : OrUndefined<MergeUnionObject<Exclude<T, Primitive>>>;
 
 type _Test_MergeUnion1 = Assert<
   MergeUnion<{ a: { x: number }; b: { y: string } } | { a: { z: boolean }; c: { w: number[] } }>,
@@ -101,20 +103,21 @@ export type PathMap<T, Prefix extends PropertyKey = ""> = true extends IsRecursi
   : { [K in Prefix]: T } & _PathMap<MergeUnion<T>, Prefix>;
 type _PathMap<T, Prefix extends PropertyKey> = UnionToIntersection<
   {
-    [K in keyof T]-?: PathMap<T[K], ConcatPath<Prefix, K>>;
+    [K in keyof T]: PathMap<T[K], ConcatPath<Prefix, K>>;
   }[keyof T]
 >;
 
 type _Test_PathMap1 = Assert<
-  PathMap<{ foo: { bar: number; baz: string[] }; qux: boolean }>,
+  PathMap<{ foo: { bar: number; baz?: string[] }; qux: boolean }>,
   {
-    "": { foo: { bar: number; baz: string[] }; qux: boolean };
-    foo: { bar: number; baz: string[] };
+    "": { foo: { bar: number; baz?: string[] }; qux: boolean };
+    foo: { bar: number; baz?: string[] };
     "foo.bar": number;
-    "foo.baz": string[];
+    "foo.baz": string[] | undefined;
+    "foo.baz.length": number | undefined;
     qux: boolean;
   } & {
-    [_ in `foo.baz.${number}`]: string;
+    [_ in `foo.baz.${number}`]: string | undefined;
   }
 >;
 type _Test_PathMap2 = Assert<
@@ -593,11 +596,14 @@ export function update<T extends AnyState>(store: Store<T>, ...replacements: Pat
 }
 
 // Patch specification type for patchState. Equivalent to a 'deep partial' but does not affect arrays.
-type PatchSpec<T> = T extends Primitive
-  ? T
-  : T extends readonly unknown[]
-    ? { readonly [K in number | "length"]?: PatchSpec<T[K]> | null } | T
-    : { readonly [K in keyof T]?: PatchSpec<T[K]> | null };
+type PatchSpec<T> =
+  | null
+  | undefined
+  | (T extends Primitive
+      ? T
+      : T extends readonly unknown[]
+        ? { readonly [K in number | "length"]?: PatchSpec<T[K]> } | T
+        : { readonly [K in keyof T]?: PatchSpec<T[K]> });
 
 /**
  * A value or patch specification for use with the `patch` function.
@@ -627,30 +633,13 @@ export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValu
  */
 export function sync<T extends StateValue>(
   store: StoreOf<T>,
-  getter: () => T,
+  getter: () => PatchValue<T>,
   setter: (value: T) => void,
 ) {
   patch(store, getter());
   return listen(store, "", () => {
     setter(peek(store, ""));
   });
-}
-
-/**
- * Creates a store that synchronizes its state with external getter and setter functions.
- * @param getter Function to get the current value
- * @param setter Function to set a new value
- * @returns A Store object that syncs with the external source
- */
-export function createSync<T extends StateValue>(
-  getter: () => T,
-  setter: (value: T) => void,
-): StoreOf<T> {
-  const store = createStore<T>(getter());
-  listen(store, "", () => {
-    setter(peek(store, ""));
-  });
-  return store;
 }
 
 /* v8 ignore start -- @preserve */
@@ -813,7 +802,8 @@ if (import.meta.vitest) {
     const setter = (val: typeof externalValue) => {
       externalValue = val;
     };
-    const store = createSync(getter, setter);
+    const store = createStore(undefined as unknown as typeof externalValue);
+    sync(store, getter, setter);
     expect(peek(store, "x")).toBe(1);
     expect(peek(store, "y")).toBe(2);
     patch(store, { x: 10 });

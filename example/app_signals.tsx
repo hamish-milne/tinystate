@@ -3,9 +3,10 @@
 
 import { computed } from "@preact/signals";
 import { For } from "@preact/signals/utils";
+import { createStore } from "../src/core";
 import { formCheckbox, formField, formText } from "../src/formSignals";
 import { SignalStoreProvider, useStoreSignal } from "../src/signals";
-import { createWebStorage } from "../src/utils";
+import { syncStorage } from "../src/utils";
 
 type Priority = "low" | "medium" | "high";
 
@@ -21,19 +22,23 @@ declare global {
   }
 }
 
+const initialState: AppState = {
+  todos: [
+    { text: "Learn Preact", completed: false, priority: "high" },
+    { text: "Build a Todo App", completed: false, priority: "medium" },
+  ],
+  newTodoText: "",
+  newTodoPriority: "medium",
+} as unknown as Pick<AppState, keyof AppState>;
+
 export function TodoApp() {
   return (
     <SignalStoreProvider
-      value={() =>
-        createWebStorage(localStorage, "todo-app", {
-          todos: [
-            { text: "Learn Preact", completed: false, priority: "high" },
-            { text: "Build a Todo App", completed: false, priority: "medium" },
-          ],
-          newTodoText: "",
-          newTodoPriority: "medium",
-        } as unknown as Pick<AppState, keyof AppState>)
-      }
+      value={() => {
+        const store = createStore<Pick<AppState, keyof AppState>>(initialState);
+        syncStorage(store, localStorage, "todo-app");
+        return store;
+      }}
     >
       <div className="min-h-screen bg-gray-50 py-8 **:transition-all **:duration-200">
         <div className="max-w-2xl mx-auto px-4">
