@@ -5,7 +5,7 @@ import { computed } from "@preact/signals";
 import { For } from "@preact/signals/utils";
 import { formCheckbox, formField, formText } from "../src/formSignals";
 import { SignalStoreProvider, useStoreSignal } from "../src/signals";
-import { webStorage } from "../src/utils";
+import { createWebStorage } from "../src/utils";
 
 type Priority = "low" | "medium" | "high";
 
@@ -25,14 +25,14 @@ export function TodoApp() {
   return (
     <SignalStoreProvider
       value={() =>
-        webStorage(localStorage, "todo-app", {
+        createWebStorage(localStorage, "todo-app", {
           todos: [
             { text: "Learn Preact", completed: false, priority: "high" },
             { text: "Build a Todo App", completed: false, priority: "medium" },
           ],
           newTodoText: "",
           newTodoPriority: "medium",
-        })
+        } as unknown as Pick<AppState, keyof AppState>)
       }
     >
       <div className="min-h-screen bg-gray-50 py-8 **:transition-all **:duration-200">

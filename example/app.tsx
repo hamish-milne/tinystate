@@ -1,11 +1,11 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource preact */
 
-import { memo } from "preact/compat";
 import { focus, patch, peek } from "../src/core";
 import { formCheckbox, formField, formText } from "../src/form";
 import { StoreProvider, useStore, useWatch } from "../src/preact";
-import { webStorage } from "../src/utils";
+import { createWebStorage } from "../src/utils";
+import { memo } from "../vendor/memo";
 
 type Priority = "low" | "medium" | "high";
 
@@ -25,14 +25,14 @@ export function TodoApp() {
   return (
     <StoreProvider
       value={() =>
-        webStorage(localStorage, "todo-app", {
+        createWebStorage(localStorage, "todo-app", {
           todos: [
             { text: "Learn Preact", completed: false, priority: "high" },
             { text: "Build a Todo App", completed: false, priority: "medium" },
           ],
           newTodoText: "",
           newTodoPriority: "medium",
-        })
+        } as unknown as Pick<AppState, keyof AppState>)
       }
     >
       <div className="min-h-screen bg-gray-50 py-8 **:transition-all **:duration-200">
