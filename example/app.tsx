@@ -3,7 +3,7 @@
 
 import { createStore, focus, patch, peek } from "../src/core";
 import { formCheckbox, formField, formText } from "../src/form";
-import { StoreProvider, useStore, useWatch } from "../src/preact";
+import { type FixedAppState, StoreProvider, useStore, useWatch } from "../src/preact";
 import { syncStorage } from "../src/utils";
 import { memo } from "../vendor/memo";
 
@@ -28,13 +28,13 @@ const initialState: AppState = {
   ],
   newTodoText: "",
   newTodoPriority: "medium",
-} as unknown as Pick<AppState, keyof AppState>;
+} as unknown as AppState;
 
 export function TodoApp() {
   return (
     <StoreProvider
       value={() => {
-        const store = createStore<Pick<AppState, keyof AppState>>(initialState);
+        const store = createStore<FixedAppState>(initialState);
         syncStorage(store, localStorage, "todo-app");
         return store;
       }}
@@ -130,7 +130,7 @@ function NewTodoForm() {
 
 function AddTodoButton() {
   const store = useStore();
-  const addDisabled = useWatch(store, "newTodoText", (state) => state.trim() === "");
+  const addDisabled = useWatch(store, "newTodoText", (state) => state.trim() === "", []);
 
   return (
     <button

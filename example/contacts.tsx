@@ -10,7 +10,14 @@
 
 import { computed, createStore, focus, patch, peek, type StoreOf } from "../src/core";
 import { dialogModal, formCheckbox, formField } from "../src/form";
-import { List, StoreProvider, useCreateStore, useStore, useWatch } from "../src/preact";
+import {
+  type FixedAppState,
+  List,
+  StoreProvider,
+  useCreateStore,
+  useStore,
+  useWatch,
+} from "../src/preact";
 import { syncStorage } from "../src/utils";
 import { memo } from "../vendor/memo";
 
@@ -55,13 +62,13 @@ const initialState: AppState = {
       isOpen: false,
     },
   },
-} as Pick<AppState, "local" | "session"> as AppState;
+} as unknown as AppState;
 
 export function ContactsApp() {
   return (
     <StoreProvider
       value={() => {
-        const store = createStore<Pick<AppState, keyof AppState>>(initialState);
+        const store = createStore<FixedAppState>(initialState);
         syncStorage(focus(store, "local"), localStorage, "contacts-app-local");
         syncStorage(focus(store, "session"), sessionStorage, "contacts-app-session");
         return store;

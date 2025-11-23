@@ -9,11 +9,13 @@ Core:
     ✔ Derived/readonly store @done(25-11-11 17:16)
     ✔ Metadata store @done(25-11-13 22:58)
     ✔ 'validate' function @done(25-11-13 22:58)
-    ☐ Deferred updates
+    ✘ Deferred updates @cancelled(25-11-23 17:20)
+        We have 'update' for bulk actions; the rest is handled by the framework anyway
     ☐ 'by-ref' symbol
-    ☐ Support partial and `|undefined` state types
-    ☐ Default values for `peek` and friends
-    ☐ Functions with `calc` parameter use `useCallback` automatically
+    ✔ Support partial and `|undefined` state types @done(25-11-23 17:20)
+    ✘ Default values for `peek` and friends @cancelled(25-11-23 17:20)
+        Default values break referential equality; we have initial values and/or call site validation
+    ✔ Functions with `calc` parameter use `useCallback` automatically @done(25-11-23 17:31)
 Form:
     ✔ Field @done(25-11-10 23:18)
     ✔ Checkbox @done(25-11-10 23:18)
@@ -32,7 +34,7 @@ Admin:
     ☐ NPM package
 Example app:
     ✔ Basic 'todo' app @done(25-11-12 21:56)
-    ☐ 'Contacts' app
-    ☐ Storage back-ends
+    ✔ 'Contacts' app @done(25-11-23 17:20)
+    ✔ Storage back-ends @done(25-11-23 17:20)
     ☐ Field validation
     ☐ Undo/redo

@@ -48,7 +48,7 @@ declare global {
 
 // Because AppState is an interface, we need to create a mapped type to fix its index signature.
 // https://github.com/microsoft/TypeScript/issues/15300
-type FixedAppState = { [K in keyof AppState]: AppState[K] };
+export type FixedAppState = { [K in keyof AppState]: AppState[K] };
 
 type AppStore = StoreOf<FixedAppState>;
 
@@ -99,19 +99,22 @@ export function useWatch<T extends AnyState, P extends keyof T, V>(
   store: StoreView<T>,
   path: P,
   calc: (this: void, stateValue: T[P], prev: V | null) => V,
+  deps: readonly unknown[],
 ): V;
 export function useWatch<T extends AnyState, P extends keyof T, V>(
   store: StoreView<T>,
   path: P = "" as P,
   calc: (this: void, stateValue: T[P], prev: V | null) => V = (x) => x as unknown as V,
+  deps: readonly unknown[] = [],
 ): V {
   const [value, setValue] = useState(() => {
     const stateValue = peek(store, path);
     return calc(stateValue, null);
   });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps of calc are passed in manually
   useEffect(
     () => listen(store, path, (newValue) => setValue((prev) => calc(newValue, prev)), true),
-    [store, path, calc],
+    [store, path, ...deps],
   );
   return value;
 }
@@ -191,11 +194,7 @@ if (import.meta.vitest) {
     const store = createStore({ count: 1 });
     let renderedValue: number | null = null;
     renderTestComponent(store, () => {
-      renderedValue = useWatch(
-        store,
-        "count",
-        useCallback<CalcFn<number>>((stateValue) => stateValue * 2, []),
-      );
+      renderedValue = useWatch(store, "count", (stateValue) => stateValue * 2, []);
       return null;
     });
     expect(renderedValue).toBe(2);

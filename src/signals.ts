@@ -45,7 +45,9 @@ declare global {
 
 // Because AppState is an interface, we need to create a mapped type to fix its index signature.
 // https://github.com/microsoft/TypeScript/issues/15300
-type AppPaths = PathMap<{ [K in keyof AppState]: AppState[K] }>;
+export type FixedAppState = { [K in keyof AppState]: AppState[K] };
+
+type AppPaths = PathMap<FixedAppState>;
 
 type AppStore = Store<AppPaths>;
 

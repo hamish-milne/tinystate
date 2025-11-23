@@ -2,9 +2,10 @@
 /** @jsxImportSource preact */
 import "preact/debug";
 import { render } from "preact";
-import { TodoApp } from "./app";
+// import { TodoApp } from "./app";
+import { ContactsApp } from "./contacts";
 
 const app = document.getElementById("app");
 if (app) {
-  render(<TodoApp />, app);
+  render(<ContactsApp />, app);
 }
