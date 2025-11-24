@@ -6,8 +6,8 @@ import { type MetadataTree, type PathPair, type StateValue, type Store, update }
  */
 export type ValidationResult<T extends StateValue, V extends StateValue> = MetadataTree<
   T,
-  { issue: string },
-  { issueKeys: (keyof T extends symbol ? never : T)[]; validated: V | null }
+  { issue?: string },
+  { issueKeys?: Extract<keyof T, string | number>[]; validated?: V }
 >;
 
 /**
@@ -48,7 +48,11 @@ export async function validate<T extends StateValue, TResult extends StateValue>
     );
     return undefined;
   }
-  update(metaStore, ["validated", result.value] as const as PathPair<ValidationResult<T, TResult>>);
+  update(
+    metaStore,
+    ["issueKeys", []] as const as PathPair<ValidationResult<T, TResult>>,
+    ["validated", result.value] as const as PathPair<ValidationResult<T, TResult>>,
+  );
   return result.value;
 }
 

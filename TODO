@@ -36,5 +36,5 @@ Example app:
     ✔ Basic 'todo' app @done(25-11-12 21:56)
     ✔ 'Contacts' app @done(25-11-23 17:20)
     ✔ Storage back-ends @done(25-11-23 17:20)
-    ☐ Field validation
+    ✔ Field validation @done(25-11-24 15:52)
     ☐ Undo/redo

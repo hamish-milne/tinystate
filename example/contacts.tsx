@@ -8,7 +8,9 @@
  * Field validation is achieved with Valibot and the `validate` function, with errors surfaced in the UI.
  */
 
-import { computed, createStore, focus, patch, peek, type StoreOf } from "../src/core";
+import type { ComponentProps } from "preact";
+import { boolean, email, type InferInput, object, pipe, regex, string } from "valibot";
+import { computed, createStore, focus, listen, patch, peek, type StoreOf } from "../src/core";
 import { dialogModal, formCheckbox, formField } from "../src/form";
 import {
   type FixedAppState,
@@ -19,14 +21,17 @@ import {
   useWatch,
 } from "../src/preact";
 import { syncStorage } from "../src/utils";
+import { type ValidationStore, validate } from "../src/validate";
 import { memo } from "../vendor/memo";
 
-type Contact = {
-  name: string;
-  email: string;
-  phone: string;
-  favorite: boolean;
-};
+const ContactSchema = object({
+  name: pipe(string(), regex(/[^\s]/, "Name cannot be empty")),
+  email: pipe(string(), email("Invalid email address")),
+  phone: pipe(string(), regex(/^\+?\d{1,14}$/, "Invalid phone number")),
+  favorite: boolean(),
+});
+
+type Contact = InferInput<typeof ContactSchema>;
 
 declare global {
   interface AppState {
@@ -175,11 +180,47 @@ const ContactListItem = memo(function ContactListItem(props: {
   );
 });
 
+function FormField(
+  props: {
+    store: StoreOf<Contact>;
+    valid: ValidationStore<typeof ContactSchema>;
+    path: "name" | "email" | "phone";
+    label: string;
+  } & ComponentProps<"input">,
+) {
+  const { store, valid, path, label, ...rest } = props;
+  const isValid = useWatch(valid, "issueKeys", (keys) => !keys?.includes(path), [path]);
+  const issue = useWatch(valid, `${path}.issue`);
+  return (
+    <div>
+      <label for={path} className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+      </label>
+      <input
+        className={`w-full border rounded-md p-2 focus:ring-2 focus:border-blue-400 ${
+          isValid ? "border-gray-300 focus:ring-blue-300" : "border-red-500 focus:ring-red-300"
+        }`}
+        {...formField(store, path, "value")}
+        {...rest}
+      />
+      {!isValid && issue ? <p className="text-red-500 text-sm mt-1">{issue}</p> : null}
+    </div>
+  );
+}
+
 function AddEditContactDialog() {
   const store = useStore();
   const contactId = useWatch(store, "session.addEdit.contactId") ?? -1;
   const isEditMode = contactId >= 0;
   const contactStore = focus(store, "session.addEdit.editing");
+  const valid = useCreateStore(() => {
+    const store = createStore({}) as ValidationStore<typeof ContactSchema>;
+    listen(contactStore, "", async (newContact) => {
+      await validate(newContact, store, ContactSchema);
+    });
+    return store;
+  }) as ValidationStore<typeof ContactSchema>;
+  const isValid = useWatch(valid, "validated", (v) => v !== undefined, []);
 
   return (
     <dialog
@@ -206,36 +247,27 @@ function AddEditContactDialog() {
       >
         <h2 className="text-xl font-bold mb-4">{isEditMode ? "Edit Contact" : "Add Contact"}</h2>
         <div className="space-y-4 mb-4">
-          <div>
-            <label for="name" className="block text-sm font-medium text-gray-700 mb-1">
-              Name
-            </label>
-            <input
-              className="w-full border border-gray-300 rounded-md p-2"
-              {...formField(contactStore, "name", "value")}
-              autoComplete="off"
-            />
-          </div>
-          <div>
-            <label for="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email
-            </label>
-            <input
-              className="w-full border border-gray-300 rounded-md p-2"
-              {...formField(contactStore, "email", "value")}
-              autoComplete="off"
-            />
-          </div>
-          <div>
-            <label for="phone" className="block text-sm font-medium text-gray-700 mb-1">
-              Phone
-            </label>
-            <input
-              className="w-full border border-gray-300 rounded-md p-2"
-              {...formField(contactStore, "phone", "value")}
-              autoComplete="off"
-            />
-          </div>
+          <FormField
+            store={contactStore}
+            valid={valid}
+            path="name"
+            label="Name"
+            autoComplete="off"
+          />
+          <FormField
+            store={contactStore}
+            valid={valid}
+            path="email"
+            label="Email"
+            autoComplete="off"
+          />
+          <FormField
+            store={contactStore}
+            valid={valid}
+            path="phone"
+            label="Phone"
+            autoComplete="off"
+          />
           <div className="flex items-center">
             <input className="mr-2" {...formCheckbox(contactStore, "favorite")} />
             <label for="favorite" className="text-sm font-medium text-gray-700">
@@ -254,6 +286,7 @@ function AddEditContactDialog() {
           <button
             type="submit"
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            disabled={!isValid}
           >
             {isEditMode ? "Save Changes" : "Add Contact"}
           </button>
