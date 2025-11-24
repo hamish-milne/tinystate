@@ -189,8 +189,7 @@ function FormField(
   } & ComponentProps<"input">,
 ) {
   const { store, valid, path, label, ...rest } = props;
-  const isValid = useWatch(valid, "issueKeys", (keys) => !keys?.includes(path), [path]);
-  const issue = useWatch(valid, `${path}.issue`);
+  const issue = useWatch(valid, `issues.${path}`);
   return (
     <div>
       <label for={path} className="block text-sm font-medium text-gray-700 mb-1">
@@ -198,12 +197,12 @@ function FormField(
       </label>
       <input
         className={`w-full border rounded-md p-2 focus:ring-2 focus:border-blue-400 ${
-          isValid ? "border-gray-300 focus:ring-blue-300" : "border-red-500 focus:ring-red-300"
+          !issue ? "border-gray-300 focus:ring-blue-300" : "border-red-500 focus:ring-red-300"
         }`}
         {...formField(store, path, "value")}
         {...rest}
       />
-      {!isValid && issue ? <p className="text-red-500 text-sm mt-1">{issue}</p> : null}
+      {issue ? <p className="text-red-500 text-sm mt-1">{issue}</p> : null}
     </div>
   );
 }
@@ -220,7 +219,7 @@ function AddEditContactDialog() {
     });
     return store;
   }) as ValidationStore<typeof ContactSchema>;
-  const isValid = useWatch(valid, "validated", (v) => v !== undefined, []);
+  const isValid = useWatch(valid, "validated", (v) => v != null, []);
 
   return (
     <dialog
@@ -230,7 +229,7 @@ function AddEditContactDialog() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const newContact = peek(contactStore);
+          const newContact = peek(valid, "validated");
           if (isEditMode) {
             patch(store, {
               local: { contacts: { [contactId]: newContact } },
@@ -285,7 +284,7 @@ function AddEditContactDialog() {
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:pointer-events-none"
             disabled={!isValid}
           >
             {isEditMode ? "Save Changes" : "Add Contact"}

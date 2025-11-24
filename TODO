@@ -11,7 +11,7 @@ Core:
     ✔ 'validate' function @done(25-11-13 22:58)
     ✘ Deferred updates @cancelled(25-11-23 17:20)
         We have 'update' for bulk actions; the rest is handled by the framework anyway
-    ☐ 'by-ref' symbol
+    ☐ 'atom' symbol
     ✔ Support partial and `|undefined` state types @done(25-11-23 17:20)
     ✘ Default values for `peek` and friends @cancelled(25-11-23 17:20)
         Default values break referential equality; we have initial values and/or call site validation
@@ -20,7 +20,8 @@ Form:
     ✔ Field @done(25-11-10 23:18)
     ✔ Checkbox @done(25-11-10 23:18)
     ✔ Radio button @done(25-11-10 23:18)
-    ☐ Field meta-state helper
+    ☐ 'isDirty'
+    ☐ 'isTouched'
 React/Preact:
     ✔ Store provider @done(25-11-10 23:25)
     ✔ State hook @done(25-11-10 23:25)

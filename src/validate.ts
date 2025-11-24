@@ -1,14 +1,20 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
-import { type MetadataTree, type PathPair, type StateValue, type Store, update } from "./core.js";
+import {
+  type PathMap,
+  type PathOf,
+  type PathPair,
+  type StateValue,
+  type Store,
+  update,
+} from "./core.js";
 
 /**
  * A PathMap representing the result of validating data against a schema.
  */
-export type ValidationResult<T extends StateValue, V extends StateValue> = MetadataTree<
-  T,
-  { issue?: string },
-  { issueKeys?: Extract<keyof T, string | number>[]; validated?: V }
->;
+export type ValidationResult<T extends StateValue, V extends StateValue> = PathMap<{
+  issues: { [K in PathOf<T>]: string };
+  validated?: V;
+}>;
 
 /**
  * A Store containing validation metadata for a specific schema.
@@ -37,12 +43,11 @@ export async function validate<T extends StateValue, TResult extends StateValue>
         .join("."),
       issue.message,
     ]);
-    const issueKeys = issues.map(([path]) => path as keyof T);
     update(
       metaStore,
       ...([
-        ...issues.map(([path, issue]) => [path, { issue }] as const),
-        ["issueKeys", issueKeys] as const,
+        ["issues", null] as const,
+        ...issues.map(([path, issue]) => [`issues.${path}`, issue] as const),
         ["validated", null] as const,
       ] as PathPair<ValidationResult<T, TResult>>[]),
     );
@@ -50,7 +55,7 @@ export async function validate<T extends StateValue, TResult extends StateValue>
   }
   update(
     metaStore,
-    ["issueKeys", []] as const as PathPair<ValidationResult<T, TResult>>,
+    ["issues", null] as const as PathPair<ValidationResult<T, TResult>>,
     ["validated", result.value] as const as PathPair<ValidationResult<T, TResult>>,
   );
   return result.value;
@@ -73,8 +78,7 @@ if (import.meta.vitest) {
 
     const result = await validate(peek(dataStore, ""), metaStore, schema);
     expect(result).toBeUndefined();
-    expect(peek(metaStore, "issueKeys")).toEqual(["age"]);
-    expect(peek(metaStore, "age")?.issue).toBe("Invalid value: Expected >=0 but received -5");
+    expect(peek(metaStore, "issues.age")).toBe("Invalid value: Expected >=0 but received -5");
   });
 
   test("validate updates meta store with validated data", async () => {
@@ -83,7 +87,7 @@ if (import.meta.vitest) {
 
     const result = await validate(peek(dataStore, ""), metaStore, schema);
     expect(result).toEqual({ name: "Bob", age: 30 });
-    expect(peek(metaStore, "issueKeys")).toEqual([]);
+    expect(peek(metaStore, "issues.age")).toBeUndefined();
     expect(peek(metaStore, "validated")).toEqual({ name: "Bob", age: 30 });
   });
 
@@ -102,8 +106,7 @@ if (import.meta.vitest) {
     const metaStore = createStore({}) as ValidationStore<typeof testSchema>;
     const result = await validate(peek(dataStore, ""), metaStore, testSchema);
     expect(result).toBeUndefined();
-    expect(peek(metaStore, "issueKeys")).toEqual([""]);
-    expect(peek(metaStore, "").issue).toBe("General error");
+    expect(peek(metaStore, "issues")).toBe("General error");
   });
 
   test("validate works when paths are strings", async () => {
@@ -121,7 +124,6 @@ if (import.meta.vitest) {
     const metaStore = createStore({}) as ValidationStore<typeof testSchema>;
     const result = await validate(peek(dataStore, ""), metaStore, testSchema);
     expect(result).toBeUndefined();
-    expect(peek(metaStore, "issueKeys")).toEqual(["foo"]);
-    expect(peek(metaStore, "foo").issue).toBe("General error");
+    expect(peek(metaStore, "issues.foo")).toBe("General error");
   });
 }
