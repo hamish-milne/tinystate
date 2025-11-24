@@ -9,6 +9,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary", "json"],
       reportOnFailure: true,
+      include: ["src/**/*.ts"],
     },
   },
   build: {
