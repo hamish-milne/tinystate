@@ -318,7 +318,7 @@ export function createStore<T extends StateValue, M extends boolean = true>(
     prefix: "",
   });
   const storeImpl = Object.preventExtensions<StoreImpl>({
-    _state: patchStateValue(null, "", factory, null),
+    _state: patchStateValue(null, "", factory, null, null),
     _listeners: new Map(),
   });
   implMap.set(store, storeImpl);
@@ -452,6 +452,7 @@ function patchStateValue(
   selector: PropertyKey,
   patch: StateValue,
   notify: Map<PropertyKey, StateValue> | null,
+  removedObjects: Set<PropertyKey> | null,
 ): StateValue {
   // Setup the stack: add initial descent steps for each segment in the selector
   // We set `keys` to empty so that parent elements are never iterated-over
@@ -507,7 +508,9 @@ function patchStateValue(
       // No changes
     } else if (typeof next !== "object" || !next) {
       newValue = next;
-      // Note that listeners of object keys will not be notified when a parent primitive changes
+      if (typeof current === "object" && current && removedObjects) {
+        removedObjects.add(path);
+      }
     } else {
       // We need to merge `current` and `next` by iterating over the keys of `next`
       if (recursionCheck.has(next)) {
@@ -526,7 +529,7 @@ function patchStateValue(
     stack.pop();
     // If there is a new value, record the change:
     if (newValue !== undefined) {
-      notify?.set(path, newValue);
+      notify?.set(path, newValue ?? undefined);
       if (stack.length) {
         stack[stack.length - 1][5].push([key, newValue]);
       } else {
@@ -541,28 +544,42 @@ function patchStateValue(
   }
 }
 
+type Key = string | number;
+
 function patchStore(
   store: Store,
   storeImpl: StoreImpl,
   path: PropertyKey,
   newValue: StateValue,
-  notify: Map<PropertyKey, StateValue>,
+  notify: Map<Key, StateValue>,
+  removedObjects: Set<Key>,
 ) {
   storeImpl._state = patchStateValue(
     storeImpl._state,
     concatPath(store.prefix, path),
     newValue,
     notify,
+    removedObjects,
   );
 }
 
 // Notifies listeners of changes recorded in the `notify` map
-function notifyChange(impl: StoreImpl, notify: Map<PropertyKey, StateValue>) {
+function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>, removedObjects: Set<Key>) {
   for (const [changedPath, value] of notify) {
     const listeners = impl._listeners.get(changedPath);
     if (listeners) {
       for (const listener of listeners) {
         listener(value, changedPath);
+      }
+    }
+    if (removedObjects.has(changedPath)) {
+      const prefix = `${changedPath}.`;
+      for (const [listenerPath, listeners] of impl._listeners) {
+        if (typeof listenerPath === "string" && listenerPath.startsWith(prefix)) {
+          for (const listener of listeners) {
+            listener(undefined, listenerPath);
+          }
+        }
       }
     }
   }
@@ -588,11 +605,12 @@ export type PathPair<T extends AnyState> = {
  */
 export function update<T extends AnyState>(store: Store<T>, ...replacements: PathPair<T>[]): void {
   const storeImpl = getImpl(store);
-  const notify = new Map<PropertyKey, StateValue>();
+  const notify = new Map<Key, StateValue>();
+  const removedObjects = new Set<Key>();
   for (const [path, value] of replacements) {
-    patchStore(store, storeImpl, path, value, notify);
+    patchStore(store, storeImpl, path, value, notify, removedObjects);
   }
-  notifyChange(storeImpl, notify);
+  notifyChange(storeImpl, notify, removedObjects);
 }
 
 // Patch specification type for patchState. Equivalent to a 'deep partial' but does not affect arrays.
@@ -620,9 +638,10 @@ export type PatchValue<T> = T | PatchSpec<T>;
  */
 export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValue<T[""]>): void {
   const storeImpl = getImpl(store);
-  const notify = new Map<PropertyKey, StateValue>();
-  patchStore(store, storeImpl, "", patchValue, notify);
-  notifyChange(storeImpl, notify);
+  const notify = new Map<Key, StateValue>();
+  const removedObjects = new Set<Key>();
+  patchStore(store, storeImpl, "", patchValue, notify, removedObjects);
+  notifyChange(storeImpl, notify, removedObjects);
 }
 
 /**
@@ -751,6 +770,24 @@ if (import.meta.vitest) {
     listen(store, "a.b", listener);
     patch(store, { a: obj }); // Set back to original object
     expect(listener).toHaveBeenCalledWith(1, "a.b");
+  });
+
+  test("deleting key notifies listeners", () => {
+    const store = createStore({ a: { b: 1 } });
+    const listener = vi.fn();
+    listen(store, "a.b", listener);
+    patch(store, { a: { b: null } });
+    expect(listener).toHaveBeenCalledWith(undefined, "a.b");
+  });
+
+  test("replacing object with primitive notifies sub-listeners", () => {
+    const store = createStore({ a: { b: 1 } as number | { b: number } });
+    const listener = vi.fn();
+    listen(store, "a.b", listener);
+    patch(store, { a: 42 });
+    patch(store, { a: 43 });
+    expect(listener).toHaveBeenCalledWith(undefined, "a.b");
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   test("focus creates sub-store", () => {

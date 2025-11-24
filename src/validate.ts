@@ -83,7 +83,7 @@ if (import.meta.vitest) {
 
     const result = await validate(peek(dataStore, ""), metaStore, schema);
     expect(result).toEqual({ name: "Bob", age: 30 });
-    expect(peek(metaStore, "issueKeys")).toBeUndefined();
+    expect(peek(metaStore, "issueKeys")).toEqual([]);
     expect(peek(metaStore, "validated")).toEqual({ name: "Bob", age: 30 });
   });
 
