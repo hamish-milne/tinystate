@@ -125,7 +125,7 @@ const ContactListItem = memo(function ContactListItem(props: {
 }) {
   const { index, itemStore } = props;
   const store = useStore();
-  const { name = "", email = "", phone = "", favorite = "" } = useWatch(itemStore) ?? {};
+  const { name = "", email = "", phone = "", favorite = false } = useWatch(itemStore) ?? {};
   return (
     <li className="p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md flex items-center justify-between">
       <div>

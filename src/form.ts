@@ -1,10 +1,48 @@
-import { listen, peek, type Store, update } from "./core.js";
+import { listen, peek, type StateValue, type Store, update } from "./core.js";
 
-export type ValueProp = "value" | "valueAsNumber" | "valueAsDate";
-export type MethodProp = "onChange" | "onInput" | "onBlur";
+export type MethodProp = "change" | "input" | "blur";
 
-function isInputElement(element: EventTarget | null): element is HTMLInputElement {
-  return element instanceof HTMLInputElement;
+const isInput = [HTMLInputElement];
+const isTextInput = [...isInput, HTMLTextAreaElement, HTMLSelectElement];
+
+function formAny<
+  TElement extends HTMLElement,
+  T extends StateValue,
+  P extends PropertyKey,
+  TMethod extends MethodProp = "change",
+>(
+  store: Store<{ [_ in P]: T }>,
+  path: P,
+  getter: (element: TElement) => T | null | undefined,
+  setter: (element: TElement, value: T) => void,
+  allowedTypes: { new (): TElement }[],
+  method: TMethod = "change" as TMethod,
+) {
+  const handler: EventListener = ({ target }) => {
+    for (const Type of allowedTypes) {
+      if (target instanceof Type) {
+        const value = getter(target);
+        if (value != null) {
+          update(store, [path, value as T]);
+        }
+        break;
+      }
+    }
+  };
+  return {
+    name: String(path),
+    id: String(path),
+    ref(node: TElement | null) {
+      if (node) {
+        node.addEventListener(method, handler);
+        const unsubscribe = listen(store, path, (value) => setter(node, value as T), true);
+        return () => {
+          node.removeEventListener(method, handler);
+          unsubscribe();
+        };
+      }
+    },
+  };
 }
 
 /**
@@ -20,40 +58,21 @@ function isInputElement(element: EventTarget | null): element is HTMLInputElemen
  * ```
  */
 export function formField<
-  TValue extends ValueProp,
+  TValue extends "value" | "valueAsNumber" | "valueAsDate",
   T extends NonNullable<HTMLInputElement[TValue]>,
   P extends PropertyKey,
-  TMethod extends MethodProp | Lowercase<MethodProp> = "onchange",
->(
-  store: Store<{ [_ in P]: T }>,
-  path: P,
-  valueProp: TValue,
-  method: TMethod = "onchange" as TMethod,
-) {
-  return {
-    name: String(path),
-    id: String(path),
-    ref(node: HTMLInputElement | null) {
-      if (node) {
-        return listen(
-          store,
-          path,
-          (value) => {
-            node[valueProp] = value ?? "";
-          },
-          true,
-        );
-      }
+  TMethod extends MethodProp = "change",
+>(store: Store<{ [_ in P]: T }>, path: P, valueProp: TValue, method?: TMethod) {
+  return formAny(
+    store,
+    path,
+    (element) => element[valueProp] as T,
+    (element, value) => {
+      element[valueProp] = value ?? "";
     },
-    [method]({ target }: Event) {
-      if (isInputElement(target)) {
-        const value = target[valueProp];
-        if (value != null) {
-          update(store, [path, value as T]);
-        }
-      }
-    },
-  };
+    isInput,
+    method,
+  );
 }
 
 /**
@@ -75,33 +94,18 @@ export function formField<
 export function formText<
   T extends string,
   P extends PropertyKey,
-  TMethod extends MethodProp | Lowercase<MethodProp> = "onchange",
->(store: Store<{ [_ in P]: T }>, path: P, method: TMethod = "onchange" as TMethod) {
-  return {
-    name: String(path),
-    id: String(path),
-    ref(node: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null) {
-      if (node) {
-        return listen(
-          store,
-          path,
-          (value) => {
-            node.value = value ?? "";
-          },
-          true,
-        );
-      }
+  TMethod extends MethodProp = "change",
+>(store: Store<{ [_ in P]: T }>, path: P, method?: TMethod) {
+  return formAny<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, T, P, TMethod>(
+    store,
+    path,
+    (element) => element.value as T,
+    (element, value) => {
+      element.value = value ?? "";
     },
-    [method]({ target }: Event) {
-      if (
-        isInputElement(target) ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement
-      ) {
-        update(store, [path, target.value as T]);
-      }
-    },
-  };
+    isTextInput,
+    method,
+  );
 }
 
 /**
@@ -116,25 +120,15 @@ export function formText<
  */
 export function formCheckbox<P extends PropertyKey>(store: Store<{ [_ in P]: boolean }>, path: P) {
   return {
-    name: String(path),
-    id: String(path),
-    ref(node: HTMLInputElement | null) {
-      if (node) {
-        return listen(
-          store,
-          path,
-          (value) => {
-            node.checked = value;
-          },
-          true,
-        );
-      }
-    },
-    onchange({ target }: Event) {
-      if (isInputElement(target)) {
-        update(store, [path, target.checked]);
-      }
-    },
+    ...formAny(
+      store,
+      path,
+      (element) => element.checked,
+      (element, value) => {
+        element.checked = Boolean(value);
+      },
+      isInput,
+    ),
     type: "checkbox",
   };
 }
@@ -157,27 +151,17 @@ export function formRadio<P extends PropertyKey, K extends string>(
   option: K,
 ) {
   return {
-    name: String(path),
-    id: String(path),
-    ref(node: HTMLInputElement | null) {
-      if (node) {
-        return listen(
-          store,
-          path,
-          (value) => {
-            node.checked = value === option;
-          },
-          true,
-        );
-      }
-    },
-    onchange({ target }: Event) {
-      if (isInputElement(target) && target.checked) {
-        update(store, [path, option]);
-      }
-    },
-    value: option,
+    ...formAny(
+      store,
+      path,
+      (element) => (element.checked ? option : undefined),
+      (element, value) => {
+        element.checked = value === option;
+      },
+      isInput,
+    ),
     type: "radio",
+    value: option,
   };
 }
 
@@ -195,27 +179,19 @@ export function formRadio<P extends PropertyKey, K extends string>(
  */
 export function dialogModal<P extends PropertyKey>(store: Store<{ [_ in P]: boolean }>, path: P) {
   return {
-    ref(node: HTMLDialogElement | null) {
-      if (node) {
-        return listen(
-          store,
-          path,
-          (value) => {
-            if (value) {
-              node.showModal();
-            } else {
-              node.close();
-            }
-          },
-          true,
-        );
-      }
-    },
-    onchange({ target }: Event) {
-      if (target instanceof HTMLDialogElement) {
-        update(store, [path, target.open]);
-      }
-    },
+    ref: formAny(
+      store,
+      path,
+      (element) => element.open,
+      (element, value) => {
+        if (value) {
+          element.showModal();
+        } else {
+          element.close();
+        }
+      },
+      [HTMLDialogElement],
+    ).ref,
   };
 }
 
