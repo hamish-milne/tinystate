@@ -188,7 +188,7 @@ if (import.meta.vitest) {
   const { createElement } = await import("preact");
 
   // biome-ignore lint/suspicious/noExplicitAny: for testing
-  function renderTestComponent(store: Store, component: () => any) {
+  function renderTestComponent(store: Store, component: () => VNode<any> | null) {
     return render(
       createElement(StoreProvider, { value: store, children: createElement(component, {}) }),
     );

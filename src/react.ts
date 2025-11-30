@@ -1,6 +1,9 @@
 import {
   createContext,
   createElement,
+  Fragment,
+  type FunctionComponent,
+  type ReactElement,
   useCallback,
   useContext,
   useEffect,
@@ -20,6 +23,7 @@ import {
   type Store,
   type StoreOf,
   type StoreView,
+  type StoreViewOf,
   update,
 } from "./core.js";
 
@@ -144,6 +148,41 @@ export function useStoreState<T extends AnyState, P extends keyof T>(
   return [value, setStateValue] as const;
 }
 
+type ItemProps<T extends StateValue, M extends boolean = boolean> = {
+  itemStore: StoreViewOf<T, M>;
+  index: number;
+};
+
+/**
+ * Component to efficiently render a list based on a Store array.
+ * @param props The component props
+ * @returns A Preact VNode containing the rendered list
+ */
+export function List<T extends StateValue, M extends boolean>(props: {
+  /**
+   * The StoreView containing an array to render.
+   */
+  store: StoreView<{ length: number } & PathMap<T, number>, M>;
+
+  /**
+   * The function component used to render each item in the list.
+   */
+  children: FunctionComponent<ItemProps<T, M>>;
+}) {
+  const { store, children } = props;
+  const { current: cache } = useRef<ReactElement<ItemProps<T, M>>[]>([]);
+  const length = useWatch(store, "length");
+
+  while (cache.length < length) {
+    const index = cache.length;
+    const itemStore = focus(store, index) as StoreViewOf<T, M>;
+    cache.push(createElement(children, { itemStore, index }));
+  }
+  cache.length = length;
+
+  return createElement(Fragment, null, ...cache);
+}
+
 /* v8 ignore start -- @preserve */
 if (import.meta.vitest) {
   const { test, expect } = import.meta.vitest;
@@ -151,7 +190,7 @@ if (import.meta.vitest) {
   const { render, act } = await import("@testing-library/react");
   const { createElement } = await import("react");
 
-  function renderTestComponent(store: Store, component: () => null) {
+  function renderTestComponent(store: Store, component: () => ReactElement | null) {
     return render(
       createElement(StoreProvider, { value: store, children: createElement(component) }),
     );
@@ -214,5 +253,25 @@ if (import.meta.vitest) {
     expect(setCount).not.toBeUndefined();
     act(() => setCount?.(100));
     expect(renderedValue).toBe(100);
+  });
+
+  test("List renders items based on store array", () => {
+    const store = createStore({ items: ["a", "b"] });
+    let renderedItems: string[] = [];
+    function ItemComponent(props: ItemProps<string>) {
+      const { itemStore } = props;
+      const value = useWatch(itemStore);
+      renderedItems.push(value);
+      return null;
+    }
+    renderTestComponent(store, () => {
+      // biome-ignore lint/suspicious/noExplicitAny: for testing
+      return createElement(List, { store: focus(store, "items"), children: ItemComponent as any });
+    });
+    expect(renderedItems).toEqual(["a", "b"]);
+    renderedItems = [];
+    act(() => patch(store, { items: ["x", "y", "z"] }));
+    renderedItems.sort();
+    expect(renderedItems).toEqual(["x", "y", "z"]);
   });
 }
