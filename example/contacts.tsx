@@ -236,9 +236,8 @@ function AddEditContactDialog() {
               session: { addEdit: { isOpen: false } },
             });
           } else {
-            const length = peek(store, "local.contacts.length") ?? 0;
             patch(store, {
-              local: { contacts: { [length]: newContact, length: length + 1 } },
+              local: { contacts: ({ length }) => ({ [length]: newContact, length: length + 1 }) },
               session: { addEdit: { isOpen: false } },
             });
           }
@@ -324,9 +323,10 @@ function DeleteContactDialog() {
           type="button"
           className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
           onClick={() => {
-            const contacts = peek(store, "local.contacts");
             patch(store, {
-              local: { contacts: contacts?.filter((_, index) => index !== contactId) },
+              local: {
+                contacts: (contacts) => contacts?.filter((_, index) => index !== contactId),
+              },
               session: { delete: { isOpen: false } },
             });
           }}

@@ -1,7 +1,7 @@
 /** @jsxRuntime automatic */
 /** @jsxImportSource preact */
 
-import { createStore, focus, patch, peek } from "../src/core";
+import { createStore, focus, patch } from "../src/core";
 import { formCheckbox, formField, formText } from "../src/form";
 import { type FixedAppState, StoreProvider, useStore, useWatch } from "../src/preact";
 import { syncStorage } from "../src/utils";
@@ -89,11 +89,7 @@ const TodoItem = memo(function TodoItem(props: { index: number }) {
       <button
         type="button"
         className="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-md opacity-0 group-hover:opacity-100"
-        onClick={() => {
-          const array = [...peek(list)];
-          array.splice(index, 1);
-          patch(list, array);
-        }}
+        onClick={() => patch(list, (array) => array.filter((_, i) => i !== index))}
       >
         Delete
       </button>
@@ -138,12 +134,7 @@ function AddTodoButton() {
       disabled={addDisabled}
       className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:hover:bg-gray-300 text-white px-6 py-3 rounded-md font-medium whitespace-nowrap"
       onClick={() => {
-        const {
-          todos: { length },
-          newTodoText,
-          newTodoPriority,
-        } = peek(store);
-        patch(store, {
+        patch(store, ({ todos: { length }, newTodoText, newTodoPriority }) => ({
           todos: {
             [length]: {
               text: newTodoText,
@@ -153,7 +144,7 @@ function AddTodoButton() {
             length: length + 1,
           },
           newTodoText: "",
-        });
+        }));
       }}
     >
       Add Todo

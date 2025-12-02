@@ -82,6 +82,12 @@ patch(store, { user: { name: null } });
 
 // Update array elements by index
 patch(store, { items: { 1: 'updated' } });
+
+// You can pass a function at any point in the tree to compute the new value based on the previous value
+patch(store, {
+  count: (prev) => prev + 1,
+  items: (prev) => [...prev, 'new item']
+});
 ```
 
 ### `update(store, ...pathPairs)`
@@ -240,7 +246,7 @@ function ItemList() {
 Built-in helpers for binding form elements to store state:
 
 ```tsx
-import { formField, formText, formCheckbox, formRadio, dialogModal } from 'tinystate/form';
+import { formField, formText, formCheckbox, formCheckboxArray, formRadio, dialogModal } from 'tinystate/form';
 
 function ProfileForm() {
   const store = useStore();
@@ -255,6 +261,10 @@ function ProfileForm() {
       
       {/* Checkboxes */}
       <input {...formCheckbox(store, 'settings.notifications')} />
+
+      {/* Multi-select checkboxes */}
+      <input {...formCheckboxArray(store, 'user.roles', 'admin')} /> Admin
+      <input {...formCheckboxArray(store, 'user.roles', 'editor')} /> Editor
       
       {/* Radio buttons */}
       <input {...formRadio(store, 'settings.theme', 'light')} /> Light
@@ -355,6 +365,14 @@ peek(store, 'invalid.path');        // Type error!
 // Patches are type-checked
 patch(store, { user: { name: 123 } }); // Type error!
 ```
+
+## Quirks & Caveats
+
+- Only JSON-serializable data types are supported (no functions, Dates, Maps, Sets, etc.)
+- While object keys can be deleted with `null`, the `null` value itself cannot be stored. Consequently a value set to `null` will read as `undefined`.
+- It is not possible to set a value to `undefined` without deleting the key.
+- There is no deferred change notification - listeners are called synchronously after each call to `patch` or `update`. However front-end frameworks like React batch updates internally.
+- There are no default values, only the initial state provided to `createStore`. Accessing non-existent paths returns `undefined`. For mission-critical code, consider making keys optional in your TypeScript types.
 
 ## Comparison with Other Libraries
 

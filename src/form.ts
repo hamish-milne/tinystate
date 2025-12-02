@@ -13,7 +13,7 @@ function formAny<
 >(
   store: Store<{ [_ in P]: T }>,
   path: P,
-  getter: (element: TElement, prev: T) => PatchValue<T>,
+  getter: (element: TElement) => PatchValue<T>,
   setter: (element: TElement, value: T) => void,
   allowedTypes: { new (): TElement }[],
   method: TMethod = "change" as TMethod,
@@ -21,7 +21,7 @@ function formAny<
   const handler: EventListener = ({ target }) => {
     for (const Type of allowedTypes) {
       if (target instanceof Type) {
-        update(store, [path, getter(target, peek(store, path))]);
+        update(store, [path, getter(target)]);
         break;
       }
     }
@@ -153,7 +153,7 @@ export function formCheckboxArray<P extends PropertyKey, K extends StateValue>(
     ...formAny(
       store,
       path,
-      (element, prev) =>
+      (element) => (prev) =>
         element.checked
           ? Array.from(new Set([...prev, option])).sort()
           : prev.filter((v) => v !== option),

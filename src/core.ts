@@ -268,7 +268,7 @@ interface StoreImpl {
 const implMap = new WeakMap<StoreView, StoreImpl>();
 
 // Safely indexes into a StateValue object or array
-function index(obj: StateValue, key: string): StateValue | undefined {
+function index(obj: StateValue, key: string): StateValue {
   return obj && typeof obj === "object" ? obj[key as string & number] : undefined;
 }
 
@@ -447,10 +447,24 @@ type PatchStack = [
   changes: [string, StateValue][],
 ][];
 
+function descend(stack: PatchStack, segment: string, keys: string[] | null): void {
+  const [current, next, path] = stack[stack.length - 1];
+  const current1 = index(current, segment);
+  const next1 = index(next, segment) as StateValue | ((prev: StateValue) => StateValue);
+  stack.push([
+    current1,
+    typeof next1 === "function" ? next1(current1) : next1,
+    concatPath(path, segment),
+    segment,
+    keys,
+    [],
+  ]);
+}
+
 function patchStateValue(
   state: StateValue,
   selector: PropertyKey,
-  patch: StateValue,
+  patch: StateValue | ((prev: StateValue) => StateValue),
   notify: Map<PropertyKey, StateValue> | null,
   removedObjects: Set<PropertyKey> | null,
 ): StateValue {
@@ -458,12 +472,11 @@ function patchStateValue(
   // We set `keys` to empty so that parent elements are never iterated-over
   const stack: PatchStack = [[state, undefined, "", "", [], []]];
   for (const segment of segments(selector)) {
-    const [current, _, path] = stack[stack.length - 1];
-    stack.push([index(current, segment), undefined, concatPath(path, segment), segment, [], []]);
+    descend(stack, segment, []);
   }
   // Set the patch value at the bottom of the stack to kick-off the patching process
   const lastStack = stack[stack.length - 1];
-  lastStack[1] = patch;
+  lastStack[1] = typeof patch === "function" ? patch(lastStack[0]) : (patch as StateValue);
   lastStack[4] = null;
   const recursionCheck = new WeakSet();
   while (true) {
@@ -474,14 +487,7 @@ function patchStateValue(
       const nextKey = keys.pop();
       if (nextKey) {
         // More keys to process
-        stack.push([
-          index(current, nextKey),
-          index(next, nextKey),
-          concatPath(path, nextKey),
-          nextKey,
-          null,
-          [],
-        ]);
+        descend(stack, nextKey, null);
         continue;
       }
       // Finished iterating over keys; check for changes
@@ -550,7 +556,8 @@ function patchStore(
   store: Store,
   storeImpl: StoreImpl,
   path: PropertyKey,
-  newValue: StateValue,
+  // biome-ignore lint/suspicious/noExplicitAny: called by generic functions
+  newValue: PatchValue<any>,
   notify: Map<Key, StateValue>,
   removedObjects: Set<Key>,
 ) {
@@ -620,14 +627,16 @@ type PatchSpec<T> =
   | (T extends Primitive
       ? T
       : T extends readonly unknown[]
-        ? { readonly [K in number | "length"]?: PatchSpec<T[K]> } | T
-        : { readonly [K in keyof T]?: PatchSpec<T[K]> });
+        ? { readonly [K in number | "length"]?: PatchSpecOrFunction<T[K]> } | T
+        : { readonly [K in keyof T]?: PatchSpecOrFunction<T[K]> });
+
+type PatchSpecOrFunction<T> = PatchSpec<T> | ((prev: T) => PatchSpec<T>);
 
 /**
  * A value or patch specification for use with the `patch` function.
  * The patch specification allows partial updates to objects and arrays, with `null` values indicating deletion of keys and `undefined` values indicating no change.
  */
-export type PatchValue<T> = T | PatchSpec<T>;
+export type PatchValue<T> = T | PatchSpecOrFunction<T>;
 
 /**
  * Patches the value at the specified path in the store's state by merging the provided patch object.
@@ -720,6 +729,14 @@ if (import.meta.vitest) {
     const store = createStore({ arr: [1, 2, 3] });
     patch(store, { arr: { 1: 20 } });
     expect(peek(store, "arr")).toEqual([1, 20, 3]);
+  });
+
+  test("patch with function", () => {
+    const store = createStore([1, 2, 3]);
+    patch(store, (prev) => prev.map((x) => x * 2));
+    expect(peek(store, "")).toEqual([2, 4, 6]);
+    patch(store, { 0: (prev) => prev + 10 });
+    expect(peek(store, "")).toEqual([12, 4, 6]);
   });
 
   test("listen to state changes", () => {
