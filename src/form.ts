@@ -1,4 +1,4 @@
-import { listen, peek, type StateValue, type Store, update } from "./core.js";
+import { listen, type PatchValue, peek, type StateValue, type Store, update } from "./core.js";
 
 export type MethodProp = "change" | "input" | "blur";
 
@@ -13,7 +13,7 @@ function formAny<
 >(
   store: Store<{ [_ in P]: T }>,
   path: P,
-  getter: (element: TElement) => T | null | undefined,
+  getter: (element: TElement, prev: T) => PatchValue<T>,
   setter: (element: TElement, value: T) => void,
   allowedTypes: { new (): TElement }[],
   method: TMethod = "change" as TMethod,
@@ -21,10 +21,7 @@ function formAny<
   const handler: EventListener = ({ target }) => {
     for (const Type of allowedTypes) {
       if (target instanceof Type) {
-        const value = getter(target);
-        if (value != null) {
-          update(store, [path, value as T]);
-        }
+        update(store, [path, getter(target, peek(store, path))]);
         break;
       }
     }
@@ -130,6 +127,44 @@ export function formCheckbox<P extends PropertyKey>(store: Store<{ [_ in P]: boo
       isInput,
     ),
     type: "checkbox",
+  };
+}
+
+/**
+ * Creates props for a checkbox input that syncs with an array in the store at the specified path.
+ * The checked state reflects whether the option is included in the array.
+ * @param store The Store object
+ * @param path The path in the store to bind to
+ * @param option The option value for this checkbox
+ * @returns An object to be spread onto a checkbox input element
+ * @example
+ * ```tsx
+ * <input type="checkbox" {...formCheckboxArray(store, "selectedItems", "item1")} /> Item 1
+ * <input type="checkbox" {...formCheckboxArray(store, "selectedItems", "item2")} /> Item 2
+ * ```
+ */
+export function formCheckboxArray<P extends PropertyKey, K extends StateValue>(
+  store: Store<{ [_ in P]: K[] }>,
+  path: P,
+  option: K,
+) {
+  const name = [path, option].join(":");
+  return {
+    ...formAny(
+      store,
+      path,
+      (element, prev) =>
+        element.checked
+          ? Array.from(new Set([...prev, option])).sort()
+          : prev.filter((v) => v !== option),
+      (element, value) => {
+        element.checked = value.includes(option);
+      },
+      isInput,
+    ),
+    type: "checkbox",
+    name,
+    id: name,
   };
 }
 
@@ -257,6 +292,31 @@ if (import.meta.vitest) {
     unsubscribe?.();
   });
 
+  test("formCheckboxArray syncs array value", () => {
+    const store = createStore({ selected: [] as string[] });
+    const propsOption1 = formCheckboxArray(store, "selected", "option1");
+    const propsOption2 = formCheckboxArray(store, "selected", "option2");
+    const inputOption1 = document.createElement("input");
+    Object.assign(inputOption1, propsOption1);
+    const inputOption2 = document.createElement("input");
+    Object.assign(inputOption2, propsOption2);
+    const unsubscribeOption1 = propsOption1.ref(inputOption1);
+    const unsubscribeOption2 = propsOption2.ref(inputOption2);
+    expect(inputOption1.checked).toBe(false);
+    expect(inputOption2.checked).toBe(false);
+    patch(store, { selected: ["option2"] });
+    expect(inputOption1.checked).toBe(false);
+    expect(inputOption2.checked).toBe(true);
+    inputOption1.checked = true;
+    fireEvent.change(inputOption1);
+    expect(peek(store, "selected")).toEqual(["option1", "option2"]);
+    inputOption2.checked = false;
+    fireEvent.change(inputOption2);
+    expect(peek(store, "selected")).toEqual(["option1"]);
+    unsubscribeOption1?.();
+    unsubscribeOption2?.();
+  });
+
   test("formRadio syncs string value", () => {
     const store = createStore({ color: "red" as string });
     const propsRed = formRadio(store, "color", "red");
@@ -274,6 +334,7 @@ if (import.meta.vitest) {
     expect(inputBlue.checked).toBe(true);
     inputRed.checked = true;
     fireEvent.change(inputRed);
+    fireEvent.change(inputBlue);
     expect(peek(store, "color")).toBe("red");
     unsubscribeRed?.();
     unsubscribeBlue?.();

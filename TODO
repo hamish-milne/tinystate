@@ -16,6 +16,7 @@ Core:
     ✘ Default values for `peek` and friends @cancelled(25-11-23 17:20)
         Default values break referential equality; we have initial values and/or call site validation
     ✔ Functions with `calc` parameter use `useCallback` automatically @done(25-11-23 17:31)
+    ☐ Allow updater functions in patch
 Form:
     ✔ Field @done(25-11-10 23:18)
     ✔ Checkbox @done(25-11-10 23:18)
