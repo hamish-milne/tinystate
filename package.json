@@ -1,4 +1,28 @@
 {
+  "name": "tinystate",
+  "version": "0.1.0",
+  "description": "A tiny state management library for React and Preact.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hamish-milne/tinystate"
+  },
+  "author": "Hamish Milne",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./*": {
+      "import": "./dist/*.js",
+      "types": "./dist/*.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "packageManager": "yarn@4.10.3",
   "type": "module",
   "devDependencies": {
@@ -54,6 +78,7 @@
     "lint": "biome lint",
     "test": "vitest run",
     "bundle": "esbuild --bundle ./src/index.ts --minify --format=esm --external:react --define:import.meta.vitest=undefined --outfile=./dist/index.js --analyze --mangle-props=^_",
-    "build": "tsc & yarn bundle"
+    "build_js": "esbuild ./src/*.ts --minify-identifiers --minify-syntax --format=esm --define:import.meta.vitest=undefined --outdir=./dist/ --mangle-props=^_ --sourcemap",
+    "build": "tsc & yarn build_js"
   }
 }

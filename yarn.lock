@@ -1901,49 +1901,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"root-workspace-0b6124@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "root-workspace-0b6124@workspace:."
-  dependencies:
-    "@biomejs/biome": "npm:^2.3.4"
-    "@preact/signals": "npm:^2.4.0"
-    "@standard-schema/spec": "npm:^1.0.0"
-    "@tailwindcss/vite": "npm:^4.1.17"
-    "@testing-library/dom": "npm:^10.4.1"
-    "@testing-library/preact": "npm:^3.2.4"
-    "@testing-library/react": "npm:^16.3.0"
-    "@types/node": "npm:^20.0.0"
-    "@types/react": "npm:^19.2.2"
-    "@types/react-dom": "npm:^19"
-    "@vitest/coverage-v8": "npm:^3.2.4"
-    esbuild: "npm:0.25.12"
-    happy-dom: "npm:^20.0.10"
-    preact: "npm:^10.27.2"
-    react: "npm:^19.2.0"
-    react-dom: "npm:^19.2.0"
-    tailwindcss: "npm:^4.1.17"
-    typescript: "npm:^5.9.3"
-    valibot: "npm:^1.1.0"
-    vite: "npm:^7.2.2"
-    vite-bundle-analyzer: "npm:^1.2.3"
-    vitest: "npm:^3.2.4"
-  peerDependencies:
-    "@preact/signals": ">=2.0.0"
-    "@standard-schema/spec": ">=1.0.0"
-    preact: ">=10.0.0"
-    react: ">=18.0.0"
-  peerDependenciesMeta:
-    "@preact/signals":
-      optional: true
-    "@standard-schema/spec":
-      optional: true
-    preact:
-      optional: true
-    react:
-      optional: true
-  languageName: unknown
-  linkType: soft
-
 "scheduler@npm:^0.27.0":
   version: 0.27.0
   resolution: "scheduler@npm:0.27.0"
@@ -2138,6 +2095,49 @@ __metadata:
   checksum: 10c0/a8020fc17799251e06a8398dcc352601d2770aa91c556b9531ecd7a12581161fd1c14e81cbdaff0c1306c93bfdde8ff6d1c1a3f9bbe6d91604f0fd4e01e2f1eb
   languageName: node
   linkType: hard
+
+"tinystate@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "tinystate@workspace:."
+  dependencies:
+    "@biomejs/biome": "npm:^2.3.4"
+    "@preact/signals": "npm:^2.4.0"
+    "@standard-schema/spec": "npm:^1.0.0"
+    "@tailwindcss/vite": "npm:^4.1.17"
+    "@testing-library/dom": "npm:^10.4.1"
+    "@testing-library/preact": "npm:^3.2.4"
+    "@testing-library/react": "npm:^16.3.0"
+    "@types/node": "npm:^20.0.0"
+    "@types/react": "npm:^19.2.2"
+    "@types/react-dom": "npm:^19"
+    "@vitest/coverage-v8": "npm:^3.2.4"
+    esbuild: "npm:0.25.12"
+    happy-dom: "npm:^20.0.10"
+    preact: "npm:^10.27.2"
+    react: "npm:^19.2.0"
+    react-dom: "npm:^19.2.0"
+    tailwindcss: "npm:^4.1.17"
+    typescript: "npm:^5.9.3"
+    valibot: "npm:^1.1.0"
+    vite: "npm:^7.2.2"
+    vite-bundle-analyzer: "npm:^1.2.3"
+    vitest: "npm:^3.2.4"
+  peerDependencies:
+    "@preact/signals": ">=2.0.0"
+    "@standard-schema/spec": ">=1.0.0"
+    preact: ">=10.0.0"
+    react: ">=18.0.0"
+  peerDependenciesMeta:
+    "@preact/signals":
+      optional: true
+    "@standard-schema/spec":
+      optional: true
+    preact:
+      optional: true
+    react:
+      optional: true
+  languageName: unknown
+  linkType: soft
 
 "tslib@npm:^2.4.0":
   version: 2.8.1
