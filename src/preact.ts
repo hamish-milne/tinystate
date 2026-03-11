@@ -16,7 +16,7 @@ import {
   type PathMap,
   type PathOf,
   peek,
-  type StateValue,
+  type StateConstraint,
   type Store,
   type StoreOf,
   type StoreView,
@@ -29,7 +29,7 @@ import {
  * @param initialState Either: a Store, a function that returns a Store, or an initial state value
  * @returns The Store instance
  */
-export function useCreateStore<T extends StateValue, M extends boolean>(
+export function useCreateStore<T extends StateConstraint, M extends boolean>(
   initialState: StoreViewOf<T, M> | T | (() => StoreViewOf<T, M>),
 ): StoreViewOf<T, M> {
   const store = useRef<StoreViewOf<T, M>>(null);
@@ -47,11 +47,7 @@ declare global {
   interface AppState {}
 }
 
-// Because AppState is an interface, we need to create a mapped type to fix its index signature.
-// https://github.com/microsoft/TypeScript/issues/15300
-export type FixedAppState = { [K in keyof AppState]: AppState[K] };
-
-type AppStore = StoreOf<FixedAppState>;
+type AppStore = StoreOf<AppState>;
 
 const StoreContext = createContext<AppStore | null>(null);
 
@@ -71,10 +67,8 @@ export function StoreProvider(props: {
  * @returns The Store object
  */
 export function useStore(): AppStore;
-export function useStore<P extends PathOf<FixedAppState>>(
-  path: P,
-): Store<Focus<PathMap<FixedAppState>, P>>;
-export function useStore<P extends PathOf<FixedAppState>>(path: P = "" as P) {
+export function useStore<P extends PathOf<AppState>>(path: P): Store<Focus<PathMap<AppState>, P>>;
+export function useStore<P extends PathOf<AppState>>(path: P = "" as P) {
   const store = useContext(StoreContext);
   if (!store) {
     throw new Error("useStore() must be used within a StoreProvider");
@@ -145,7 +139,7 @@ export function useStoreState<T extends AnyState, P extends keyof T>(
   return [value, setStateValue] as const;
 }
 
-type ItemProps<T extends StateValue, M extends boolean = boolean> = {
+type ItemProps<T extends StateConstraint, M extends boolean = boolean> = {
   itemStore: StoreViewOf<T, M>;
   index: number;
 };
@@ -155,7 +149,7 @@ type ItemProps<T extends StateValue, M extends boolean = boolean> = {
  * @param props The component props
  * @returns A Preact VNode containing the rendered list
  */
-export function List<T extends StateValue, M extends boolean>(props: {
+export function List<T extends StateConstraint, M extends boolean>(props: {
   /**
    * The StoreView containing an array to render.
    */

@@ -3,6 +3,7 @@ import {
   type PathMap,
   type PathOf,
   type PathPair,
+  type StateConstraint,
   type StateValue,
   type Store,
   update,
@@ -11,7 +12,7 @@ import {
 /**
  * A PathMap representing the result of validating data against a schema.
  */
-export type ValidationResult<T extends StateValue, V extends StateValue> = PathMap<{
+export type ValidationResult<T extends StateConstraint, V extends StateConstraint> = PathMap<{
   issues: { [K in PathOf<T>]: string };
   validated?: V;
 }>;
@@ -30,7 +31,7 @@ export type ValidationStore<TSchema extends StandardSchemaV1<StateValue, StateVa
  * @param schema The schema to validate against
  * @returns The validated data if valid, otherwise undefined
  */
-export async function validate<T extends StateValue, TResult extends StateValue>(
+export async function validate<T extends StateConstraint, TResult extends StateConstraint>(
   data: T,
   metaStore: Store<ValidationResult<T, TResult>>,
   schema: StandardSchemaV1<T, TResult>,

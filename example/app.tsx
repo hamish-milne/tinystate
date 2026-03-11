@@ -3,7 +3,7 @@
 
 import { createStore, focus, patch } from "../src/core";
 import { formCheckbox, formField, formText } from "../src/form";
-import { type FixedAppState, StoreProvider, useStore, useWatch } from "../src/preact";
+import { StoreProvider, useStore, useWatch } from "../src/preact";
 import { syncStorage } from "../src/utils";
 import { memo } from "../vendor/memo";
 
@@ -34,7 +34,7 @@ export function TodoApp() {
   return (
     <StoreProvider
       value={() => {
-        const store = createStore<FixedAppState>(initialState);
+        const store = createStore<AppState>(initialState);
         syncStorage(store, localStorage, "todo-app");
         return store;
       }}

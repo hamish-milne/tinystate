@@ -1,6 +1,6 @@
-import { createStore, type StateValue, type StoreOf, sync } from "./core.js";
+import { createStore, type StateConstraint, type StoreOf, sync } from "./core.js";
 
-export function syncStorage<T extends StateValue>(
+export function syncStorage<T extends StateConstraint>(
   store: StoreOf<T>,
   storage: Storage,
   key: string,

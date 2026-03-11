@@ -1,4 +1,4 @@
-import { listen, type PatchValue, peek, type StateValue, type Store, update } from "./core.js";
+import { listen, type PatchValue, peek, type StateConstraint, type Store, update } from "./core.js";
 
 export type MethodProp = "change" | "input" | "blur";
 
@@ -7,7 +7,7 @@ const isTextInput = [...isInput, HTMLTextAreaElement, HTMLSelectElement];
 
 function formAny<
   TElement extends HTMLElement,
-  T extends StateValue,
+  T extends StateConstraint,
   P extends PropertyKey,
   TMethod extends MethodProp = "change",
 >(
@@ -143,7 +143,7 @@ export function formCheckbox<P extends PropertyKey>(store: Store<{ [_ in P]: boo
  * <input type="checkbox" {...formCheckboxArray(store, "selectedItems", "item2")} /> Item 2
  * ```
  */
-export function formCheckboxArray<P extends PropertyKey, K extends StateValue>(
+export function formCheckboxArray<P extends PropertyKey, K extends StateConstraint>(
   store: Store<{ [_ in P]: K[] }>,
   path: P,
   option: K,

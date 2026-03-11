@@ -19,7 +19,7 @@ import {
   type PathMap,
   type PathOf,
   peek,
-  type StateValue,
+  type StateConstraint,
   type Store,
   type StoreOf,
   type StoreView,
@@ -32,7 +32,7 @@ import {
  * @param initialState Either: a Store, a function that returns a Store, or an initial state value
  * @returns The Store instance
  */
-export function useCreateStore<T extends StateValue>(
+export function useCreateStore<T extends StateConstraint>(
   initialState: StoreOf<T> | T | (() => StoreOf<T>),
 ): StoreOf<T> {
   const store = useRef<StoreOf<T>>(null);
@@ -148,7 +148,7 @@ export function useStoreState<T extends AnyState, P extends keyof T>(
   return [value, setStateValue] as const;
 }
 
-type ItemProps<T extends StateValue, M extends boolean = boolean> = {
+type ItemProps<T extends StateConstraint, M extends boolean = boolean> = {
   itemStore: StoreViewOf<T, M>;
   index: number;
 };
@@ -158,7 +158,7 @@ type ItemProps<T extends StateValue, M extends boolean = boolean> = {
  * @param props The component props
  * @returns A Preact VNode containing the rendered list
  */
-export function List<T extends StateValue, M extends boolean>(props: {
+export function List<T extends StateConstraint, M extends boolean>(props: {
   /**
    * The StoreView containing an array to render.
    */

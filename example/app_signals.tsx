@@ -5,7 +5,7 @@ import { computed } from "@preact/signals";
 import { For } from "@preact/signals/utils";
 import { createStore } from "../src/core";
 import { formCheckbox, formField, formText } from "../src/formSignals";
-import { type FixedAppState, SignalStoreProvider, useStoreSignal } from "../src/signals";
+import { SignalStoreProvider, useStoreSignal } from "../src/signals";
 import { syncStorage } from "../src/utils";
 
 type Priority = "low" | "medium" | "high";
@@ -35,7 +35,7 @@ export function TodoApp() {
   return (
     <SignalStoreProvider
       value={() => {
-        const store = createStore<FixedAppState>(initialState);
+        const store = createStore(initialState);
         syncStorage(store, localStorage, "todo-app");
         return store;
       }}

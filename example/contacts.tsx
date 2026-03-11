@@ -12,14 +12,7 @@ import type { ComponentProps } from "preact";
 import { boolean, email, type InferInput, object, pipe, regex, string } from "valibot";
 import { computed, createStore, focus, listen, patch, peek, type StoreOf } from "../src/core";
 import { dialogModal, formCheckbox, formField } from "../src/form";
-import {
-  type FixedAppState,
-  List,
-  StoreProvider,
-  useCreateStore,
-  useStore,
-  useWatch,
-} from "../src/preact";
+import { List, StoreProvider, useCreateStore, useStore, useWatch } from "../src/preact";
 import { syncStorage } from "../src/utils";
 import { type ValidationStore, validate } from "../src/validate";
 import { memo } from "../vendor/memo";
@@ -73,7 +66,7 @@ export function ContactsApp() {
   return (
     <StoreProvider
       value={() => {
-        const store = createStore<FixedAppState>(initialState);
+        const store = createStore(initialState);
         syncStorage(focus(store, "local"), localStorage, "contacts-app-local");
         syncStorage(focus(store, "session"), sessionStorage, "contacts-app-session");
         return store;

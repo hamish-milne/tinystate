@@ -9,6 +9,10 @@ export type StateValue = Primitive | StateObject | StateArray;
 type StateObject = { readonly [key in string | number]?: StateValue };
 type StateArray = readonly StateValue[];
 
+// We use `unknown` here for better developer experience, rather than the more correct `object | Primitive`.
+// This allows any value to be used as state without requiring awkward type conversions if a non-compatible (but not present in practice) type is found somewhere in the tree.
+export type StateConstraint = unknown; // object | Primitive;
+
 // We don't support symbol keys, but 'pretending to' simplifies some type logic.
 // This helper filters out symbols where that's strictly necessary, such as in path stringification.
 type Stringify<T> = T extends symbol ? never : T;
@@ -56,9 +60,10 @@ type MergeUnionObject<T> = { [K in AllKeys<T>]: OptionalKey<T, K> };
 
 type OrUndefined<T> = { [K in keyof T]: T[K] | undefined };
 
-type MergeUnion<T> = Extract<T, Primitive> extends never
-  ? MergeUnionObject<T>
-  : OrUndefined<MergeUnionObject<Exclude<T, Primitive>>>;
+type MergeUnion<T> =
+  Extract<T, Primitive> extends never
+    ? MergeUnionObject<T>
+    : OrUndefined<MergeUnionObject<Exclude<T, Primitive>>>;
 
 type _Test_MergeUnion1 = Assert<
   MergeUnion<{ a: { x: number }; b: { y: string } } | { a: { z: boolean }; c: { w: number[] } }>,
@@ -98,9 +103,10 @@ type _Test_MergeUnion6 = Assert<
  * // }
  * ```
  */
-export type PathMap<T, Prefix extends PropertyKey = ""> = true extends IsRecursive<T>
-  ? { [K in Prefix]: T }
-  : { [K in Prefix]: T } & _PathMap<MergeUnion<T>, Prefix>;
+export type PathMap<T, Prefix extends PropertyKey = ""> =
+  true extends IsRecursive<T>
+    ? { [K in Prefix]: T }
+    : { [K in Prefix]: T } & _PathMap<MergeUnion<T>, Prefix>;
 type _PathMap<T, Prefix extends PropertyKey> = UnionToIntersection<
   {
     [K in keyof T]: PathMap<T[K], ConcatPath<Prefix, K>>;
@@ -150,9 +156,9 @@ type _Test_PathMap2 = Assert<
  * ```
  */
 export type MetadataTree<
-  T extends StateValue,
-  M extends StateValue,
-  R extends StateValue,
+  T extends StateConstraint,
+  M extends StateConstraint,
+  R extends StateConstraint,
 > = _MetadataTree<PathMap<T>, PathMap<M>, PathMap<R>>;
 type _MetadataTree<
   T extends AnyState,
@@ -209,7 +215,7 @@ export type ValueOf<T, P extends PropertyKey | undefined> = P extends keyof Path
 /**
  * A state object with any keys and values, as a fallback type.
  */
-export type AnyState = Record<PropertyKey, StateValue>;
+export type AnyState = Record<PropertyKey, StateConstraint>;
 
 // Unique brand to identify Store objects. In practice we check for presence in implMap,
 // but this symbol ensures type safety as well.
@@ -247,7 +253,7 @@ export type Store<T extends AnyState = AnyState> = StoreView<T, true>;
 /**
  * A read-only StoreView object that points to a state tree.
  */
-export type StoreViewOf<T extends StateValue, Mutable extends boolean = boolean> = StoreView<
+export type StoreViewOf<T extends StateConstraint, Mutable extends boolean = boolean> = StoreView<
   PathMap<T>,
   Mutable
 >;
@@ -255,7 +261,7 @@ export type StoreViewOf<T extends StateValue, Mutable extends boolean = boolean>
 /**
  * A mutable Store object for state of type `T`.
  */
-export type StoreOf<T extends StateValue> = StoreViewOf<T, true>;
+export type StoreOf<T extends StateConstraint> = StoreViewOf<T, true>;
 
 // Holds the actual mutable state and listeners for a Store
 interface StoreImpl {
@@ -303,14 +309,14 @@ function getImpl(store: StoreView): StoreImpl {
  * @param factory The initial state value
  * @returns A new Store object
  */
-export function createStore<T extends StateValue, M extends boolean = true>(
+export function createStore<T extends StateConstraint, M extends boolean = true>(
   factory: T | StoreViewOf<T, M> | (() => StoreViewOf<T, M>),
 ): StoreViewOf<T, M> {
   if (isStore<PathMap<T>, M>(factory)) {
     return factory;
   }
   if (typeof factory === "function") {
-    return factory();
+    return (factory as () => StoreViewOf<T, M>)();
   }
   const store = Object.freeze<StoreViewOf<T, M>>({
     [brand]: Object.freeze([true as M, null as unknown as PathMap<T>] as const),
@@ -318,7 +324,7 @@ export function createStore<T extends StateValue, M extends boolean = true>(
     prefix: "",
   });
   const storeImpl = Object.preventExtensions<StoreImpl>({
-    _state: patchStateValue(null, "", factory, null, null),
+    _state: patchStateValue(null, "", factory as StateValue, null, null),
     _listeners: new Map(),
   });
   implMap.set(store, storeImpl);
@@ -391,7 +397,7 @@ type Numberify<T> = T extends `${number}` ? number : T;
 /**
  * Type that represents a sub-store focused on the state at the specified path prefix.
  */
-export type Focus<T extends Record<PropertyKey, StateValue>, P extends keyof T> = "" extends P
+export type Focus<T extends Record<PropertyKey, StateConstraint>, P extends keyof T> = "" extends P
   ? T
   : {
       [K in keyof T as P extends K
@@ -408,7 +414,7 @@ export type Focus<T extends Record<PropertyKey, StateValue>, P extends keyof T> 
  * @returns A new Store object representing the sub-store
  */
 export function focus<
-  T extends Record<PropertyKey, StateValue>,
+  T extends Record<PropertyKey, StateConstraint>,
   P extends keyof T,
   M extends boolean,
 >(store: StoreView<T, M>, path: P): StoreView<Focus<T, P>, M> {
@@ -428,7 +434,7 @@ export function focus<
  * @param path The path in the source store to derive from
  * @param computeFn The function to compute the derived state from the source state value
  */
-export function computed<T extends AnyState, P extends keyof T, V extends StateValue>(
+export function computed<T extends AnyState, P extends keyof T, V extends StateConstraint>(
   store: StoreView<T>,
   path: P,
   computeFn: (stateValue: T[P]) => V,
@@ -659,7 +665,7 @@ export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValu
  * @param setter Function to set a new value
  * @returns A Store object that syncs with the external source
  */
-export function sync<T extends StateValue>(
+export function sync<T extends StateConstraint>(
   store: StoreOf<T>,
   getter: () => PatchValue<T>,
   setter: (value: T) => void,
