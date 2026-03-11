@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../src/index.ts"],
+  "sourcesContent": ["export * from \"./core.js\";\nexport * from \"./form.js\";\nexport * from \"./react.js\";\nexport * from \"./utils.js\";\nexport * from \"./validate.js\";\n"],
+  "mappings": "AAAA,cAAc;AACd,cAAc;AACd,cAAc;AACd,cAAc;AACd,cAAc;",
+  "names": []
+}
