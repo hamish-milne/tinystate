@@ -1,8 +1,8 @@
 import {
   createContext as T,
   createElement as l,
-  Fragment as f,
-  useCallback as V,
+  Fragment as V,
+  useCallback as f,
   useContext as h,
   useEffect as P,
   useRef as i,
@@ -13,18 +13,18 @@ import {
   focus as S,
   listen as v,
   peek as C,
-  update as A
+  update as b
 } from "./core.js";
-function b(t) {
+function A(t) {
   const e = i(null);
   return e.current || (e.current = w(t)), e.current;
 }
 const m = T(null);
-function F(t) {
+function k(t) {
   const { value: e, children: n } = t;
-  return l(m.Provider, { value: b(e) }, n);
+  return l(m.Provider, { value: A(e) }, n);
 }
-function M(t = "") {
+function W(t = "") {
   const e = h(m);
   if (!e)
     throw new Error("useStore() must be used within a StoreProvider");
@@ -40,30 +40,30 @@ function x(t, e = "", n = (o) => o, r = []) {
     [t, e, ...r]
   ), o;
 }
-function W(t, e = "") {
-  const n = x(t, e), r = V(
-    (o) => A(t, [e, o]),
+function B(t, e = "") {
+  const n = x(t, e), r = f(
+    (o) => b(t, [e, o]),
     [t, e]
   );
   return [n, r];
 }
-function B(t) {
+function R(t) {
   const { store: e, children: n } = t, { current: r } = i([]), o = x(e, "length");
   for (; r.length < o; ) {
     const a = r.length, s = S(e, a);
     r.push(l(n, { itemStore: s, index: a }));
   }
-  return r.length = o, l(f, null, ...r);
+  return r.length = o, l(V, null, ...r);
 }
 /* v8 ignore start -- @preserve */
 if (0)
-  var R;
+  var F;
 export {
-  B as List,
-  F as StoreProvider,
-  b as useCreateStore,
-  M as useStore,
-  W as useStoreState,
+  R as List,
+  k as StoreProvider,
+  A as useCreateStore,
+  W as useStore,
+  B as useStoreState,
   x as useWatch
 };
 //# sourceMappingURL=react.js.map

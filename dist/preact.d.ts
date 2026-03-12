@@ -14,7 +14,7 @@ declare global {
     interface AppState {
     }
 }
-type AppStore = StoreOf<AppState>;
+export type AppStore = StoreOf<AppState>;
 /**
  * The Provider component for supplying a Store to the component tree.
  */
