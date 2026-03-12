@@ -1,11 +1,11 @@
-import { type FunctionComponent } from "react";
+import { type FunctionComponent, type ProviderProps, type ReactElement } from "react";
 import { type AnyState, type Focus, type PathMap, type PathOf, type StateConstraint, type Store, type StoreOf, type StoreView, type StoreViewOf } from "./core.js";
 /**
  * Hook to create and persist a Store instance.
  * @param initialState Either: a Store, a function that returns a Store, or an initial state value
  * @returns The Store instance
  */
-export declare function useCreateStore<T extends StateConstraint>(initialState: StoreOf<T> | T | (() => StoreOf<T>)): StoreOf<T>;
+export declare function useCreateStore<T extends StateConstraint, M extends boolean>(initialState: StoreViewOf<T, M> | T | (() => StoreViewOf<T, M>)): StoreViewOf<T, M>;
 declare global {
     /**
      * The global application state interface used by {@link StoreProvider} and {@link useStore}.
@@ -14,23 +14,20 @@ declare global {
     interface AppState {
     }
 }
-export type FixedAppState = {
-    [K in keyof AppState]: AppState[K];
-};
-type AppStore = StoreOf<FixedAppState>;
+export type AppStore = StoreOf<AppState>;
 /**
  * The Provider component for supplying a Store to the component tree.
  */
 export declare function StoreProvider(props: {
     value: AppState | AppStore | (() => AppStore);
     children: React.ReactNode;
-}): import("react").FunctionComponentElement<import("react").ProviderProps<AppStore | null>>;
+}): ReactElement<ProviderProps<AppStore | null>>;
 /**
  * Hook to access the Store from the React context.
  * @returns The Store object
  */
 export declare function useStore(): AppStore;
-export declare function useStore<P extends PathOf<FixedAppState>>(path: P): Store<Focus<PathMap<FixedAppState>, P>>;
+export declare function useStore<P extends PathOf<AppState>>(path: P): Store<Focus<PathMap<AppState>, P>>;
 /**
  * Calculation function type for useWatch
  */
