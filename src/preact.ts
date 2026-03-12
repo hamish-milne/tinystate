@@ -47,7 +47,7 @@ declare global {
   interface AppState {}
 }
 
-type AppStore = StoreOf<AppState>;
+export type AppStore = StoreOf<AppState>;
 
 const StoreContext = createContext<AppStore | null>(null);
 

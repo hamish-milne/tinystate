@@ -3,6 +3,7 @@ import {
   createElement,
   Fragment,
   type FunctionComponent,
+  type ProviderProps,
   type ReactElement,
   useCallback,
   useContext,
@@ -32,10 +33,10 @@ import {
  * @param initialState Either: a Store, a function that returns a Store, or an initial state value
  * @returns The Store instance
  */
-export function useCreateStore<T extends StateConstraint>(
-  initialState: StoreOf<T> | T | (() => StoreOf<T>),
-): StoreOf<T> {
-  const store = useRef<StoreOf<T>>(null);
+export function useCreateStore<T extends StateConstraint, M extends boolean>(
+  initialState: StoreViewOf<T, M> | T | (() => StoreViewOf<T, M>),
+): StoreViewOf<T, M> {
+  const store = useRef<StoreViewOf<T, M>>(null);
   if (!store.current) {
     store.current = createStore(initialState);
   }
@@ -50,11 +51,7 @@ declare global {
   interface AppState {}
 }
 
-// Because AppState is an interface, we need to create a mapped type to fix its index signature.
-// https://github.com/microsoft/TypeScript/issues/15300
-export type FixedAppState = { [K in keyof AppState]: AppState[K] };
-
-type AppStore = StoreOf<FixedAppState>;
+export type AppStore = StoreOf<AppState>;
 
 const StoreContext = createContext<AppStore | null>(null);
 
@@ -64,7 +61,7 @@ const StoreContext = createContext<AppStore | null>(null);
 export function StoreProvider(props: {
   value: AppState | AppStore | (() => AppStore);
   children: React.ReactNode;
-}) {
+}): ReactElement<ProviderProps<AppStore | null>> {
   const { value, children } = props;
   return createElement(StoreContext.Provider, { value: useCreateStore(value) }, children);
 }
@@ -74,10 +71,8 @@ export function StoreProvider(props: {
  * @returns The Store object
  */
 export function useStore(): AppStore;
-export function useStore<P extends PathOf<FixedAppState>>(
-  path: P,
-): Store<Focus<PathMap<FixedAppState>, P>>;
-export function useStore<P extends PathOf<FixedAppState>>(path: P = "" as P) {
+export function useStore<P extends PathOf<AppState>>(path: P): Store<Focus<PathMap<AppState>, P>>;
+export function useStore<P extends PathOf<AppState>>(path: P = "" as P) {
   const store = useContext(StoreContext);
   if (!store) {
     throw new Error("useStore() must be used within a StoreProvider");

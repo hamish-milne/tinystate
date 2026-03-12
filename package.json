@@ -79,6 +79,6 @@
     "test": "vitest run",
     "bundle": "esbuild --bundle ./src/index.ts --minify --format=esm --external:react --define:import.meta.vitest=undefined --outfile=./dist/index.js --analyze --mangle-props=^_",
     "build_js": "esbuild ./src/*.ts --minify-identifiers --minify-syntax --format=esm --define:import.meta.vitest=undefined --outdir=./dist/ --mangle-props=^_ --sourcemap",
-    "build": "tsc & yarn build_js"
+    "build": "rm tsconfig.tsbuildinfo ; tsc & yarn build_js"
   }
 }
