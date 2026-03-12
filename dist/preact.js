@@ -1,5 +1,5 @@
 import {
-  createContext as x,
+  createContext as V,
   createElement as p,
   Fragment as T
 } from "preact";
@@ -15,7 +15,7 @@ function A(t) {
   const e = i(null);
   return e.current || (e.current = w(t)), e.current;
 }
-const m = x(null);
+const m = V(null);
 function W(t) {
   const { value: e, children: n } = t;
   return p(m.Provider, { value: A(e) }, n);
@@ -26,7 +26,7 @@ function B(t = "") {
     throw new Error("useStore() must be used within a StoreProvider");
   return S(e, t);
 }
-function V(t, e = "", n = (o) => o, r = []) {
+function x(t, e = "", n = (o) => o, r = []) {
   const [o, u] = y(() => {
     const s = v(t, e);
     return n(s, null);
@@ -37,14 +37,14 @@ function V(t, e = "", n = (o) => o, r = []) {
   ), o;
 }
 function F(t, e = "") {
-  const n = V(t, e), r = f(
+  const n = x(t, e), r = f(
     (o) => b(t, [e, o]),
     [t, e]
   );
   return [n, r];
 }
 function L(t) {
-  const { store: e, children: n } = t, { current: r } = i([]), o = V(e, "length");
+  const { store: e, children: n } = t, { current: r } = i([]), o = x(e, "length");
   for (; r.length < o; ) {
     const u = r.length, s = S(e, u);
     r.push(p(n, { itemStore: s, index: u }));
@@ -60,6 +60,6 @@ export {
   A as useCreateStore,
   B as useStore,
   F as useStoreState,
-  V as useWatch
+  x as useWatch
 };
 //# sourceMappingURL=preact.js.map
