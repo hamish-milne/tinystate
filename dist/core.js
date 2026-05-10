@@ -1,173 +1,201 @@
-const h = /* @__PURE__ */ Symbol("Store"), f = /* @__PURE__ */ new WeakMap();
+const V = /* @__PURE__ */ Symbol("atom"), m = /* @__PURE__ */ Symbol("Store"), {
+  freeze: u,
+  preventExtensions: R,
+  entries: F,
+  fromEntries: z,
+  keys: $,
+  assign: w
+} = Object, { isArray: A, from: K } = Array, b = /* @__PURE__ */ new WeakMap();
 function g(e, n) {
   return e && typeof e == "object" ? e[n] : void 0;
 }
-function k(e) {
+function B(e) {
   return String(e).match(/[^.]+/g) || [];
 }
-function _(e, n) {
-  let a = e;
-  for (const t of k(n))
-    a = g(a, t);
-  return a;
+function q(e, n) {
+  let s = e;
+  for (const t of B(n))
+    s = g(s, t);
+  return s;
 }
-function d(e, n) {
+function f(e, n) {
   return e === "" ? n : n === "" ? e : `${e}.${n}`;
 }
 function x(e) {
-  const n = f.get(e.root || e);
+  const n = b.get(e.root || e);
   if (!n)
     throw new Error("Invalid store");
   return n;
 }
-function U(e) {
-  if (I(e))
+function L(e) {
+  if (N(e))
     return e;
   if (typeof e == "function")
     return e();
-  const n = Object.freeze({
-    [h]: Object.freeze([!0, null]),
+  const n = u({
+    [m]: u([!0, null]),
     root: null,
     prefix: ""
-  }), a = Object.preventExtensions({
-    t: B(null, "", e, null, null),
-    e: /* @__PURE__ */ new Map()
+  }), s = R({
+    n: U(null, "", e, null, null),
+    t: /* @__PURE__ */ new Map(),
+    r: /* @__PURE__ */ new Map()
   });
-  return f.set(n, a), n;
+  return b.set(n, s), n;
 }
-function E(e) {
-  f.delete(e.root || e);
+function D(e) {
+  b.delete(e.root || e);
 }
-function I(e) {
-  return f.has(e);
+function N(e) {
+  return b.has(e);
 }
-function V(e, n = "") {
-  return _(x(e).t, d(e.prefix, n));
+function O(e, n = "") {
+  return q(x(e).n, f(e.prefix, n));
 }
-function w(e, n, a, t = !1) {
-  const r = x(e), o = d(e.prefix, n);
-  let s = r.e.get(o);
-  return s || (s = /* @__PURE__ */ new Set(), r.e.set(o, s)), s.add(a), t && a(V(e, n), n), () => s.delete(a);
+function j(e, n, s, t = !1) {
+  const o = x(e), r = f(e.prefix, n);
+  let a = o.t.get(r);
+  return a || (a = /* @__PURE__ */ new Set(), o.t.set(r, a)), a.add(s), t && s(O(e, n), n), () => a.delete(s);
 }
-function H(e, n) {
-  return n === "" ? e : Object.freeze({
-    [h]: e[h],
+function G(e, n, s = !1) {
+  const { r: t } = x(e);
+  return t.set(n, s), () => t.delete(n);
+}
+function J(e, n) {
+  return n === "" ? e : u({
+    [m]: e[m],
     root: e.root || e,
-    prefix: d(e.prefix, n)
+    prefix: f(e.prefix, n)
   });
 }
-function R(e, n, a) {
-  const t = U(void 0);
-  return w(e, n, (r) => j(t, a(r)), !0), t;
+function Q(e, n, s) {
+  const t = L(void 0);
+  return j(e, n, (o) => W(t, s(o)), !0), t;
 }
-function K(e, n, a) {
-  const [t, r, o] = e[e.length - 1], s = g(t, n), i = g(r, n);
+function C(e, n, s) {
+  const [t, o, r] = e[e.length - 1], a = g(t, n), i = g(o, n);
   e.push([
-    s,
-    typeof i == "function" ? i(s) : i,
-    d(o, n),
-    n,
     a,
+    typeof i == "function" ? i(a) : i,
+    f(r, n),
+    n,
+    s,
     []
   ]);
 }
-function B(e, n, a, t, r) {
-  const o = [[e, void 0, "", "", [], []]];
-  for (const c of k(n))
-    K(o, c, []);
-  const s = o[o.length - 1];
-  s[1] = typeof a == "function" ? a(s[0]) : a, s[4] = null;
+function U(e, n, s, t, o) {
+  const r = [[e, void 0, "", "", [], []]];
+  for (const c of B(n))
+    C(r, c, []);
+  const a = r[r.length - 1];
+  a[1] = typeof s == "function" ? s(a[0]) : s, a[4] = null;
   const i = /* @__PURE__ */ new WeakSet();
   for (; ; ) {
-    const [c, u, y, C, m, P] = o[o.length - 1];
+    const [c, l, y, E, P, v] = r[r.length - 1];
     let p;
-    if (m) {
-      const l = m.pop();
-      if (l) {
-        K(o, l, null);
+    if (P) {
+      const d = P.pop();
+      if (d) {
+        C(r, d, null);
         continue;
       }
-      if (P.length > 0) {
-        const v = c && typeof c == "object" ? Object.entries(c) : [];
-        Array.isArray(c) && v.push(["length", c.length]);
-        const b = new Map(v);
-        for (const [M, T] of P)
-          T === null ? b.delete(M) : T !== void 0 && b.set(M, T);
-        const S = Object.fromEntries(b);
-        p = Object.freeze(
-          typeof S.length == "number" ? Object.assign([], S) : S
-        );
+      if (v.length > 0) {
+        const M = c && typeof c == "object" ? F(c) : [];
+        A(c) && M.push(["length", c.length]);
+        const S = new Map(M);
+        for (const [k, h] of v)
+          h === null ? S.delete(k) : h !== void 0 && S.set(k, h);
+        const T = z(S);
+        p = u(typeof T.length == "number" ? w([], T) : T);
       }
-    } else if (c !== u)
-      if (typeof u != "object" || !u)
-        p = u, typeof c == "object" && c && r && r.add(y);
+    } else if (c !== l)
+      if (typeof l != "object" || !l || H(l))
+        p = l, typeof c == "object" && c && o && o.add(y);
       else {
-        if (i.has(u))
+        if (i.has(l))
           throw new Error(`Circular reference detected at path "${y}"`);
-        i.add(u);
-        const l = Object.keys(u).reverse();
-        Array.isArray(u) && l.push("length"), o[o.length - 1][4] = l;
+        i.add(l);
+        const d = $(l).reverse();
+        A(l) && d.push("length"), r[r.length - 1][4] = d;
         continue;
       }
-    if (i.delete(u), o.pop(), p !== void 0)
-      if (t?.set(y, p ?? void 0), o.length)
-        o[o.length - 1][5].push([C, p]);
+    if (i.delete(l), r.pop(), p !== void 0)
+      if (t?.set(y, p ?? void 0), r.length)
+        r[r.length - 1][5].push([E, p]);
       else
         return p;
-    if (!o.length)
+    if (!r.length)
       return e;
   }
 }
-function A(e, n, a, t, r, o) {
-  n.t = B(
-    n.t,
-    d(e.prefix, a),
+function _(e, n, s, t, o, r) {
+  n.n = U(
+    n.n,
+    f(e.prefix, s),
     t,
-    r,
-    o
+    o,
+    r
   );
 }
-function O(e, n, a) {
-  for (const [t, r] of n) {
-    const o = e.e.get(t);
-    if (o)
-      for (const s of o)
-        s(r, t);
-    if (a.has(t)) {
-      const s = `${t}.`;
-      for (const [i, c] of e.e)
-        if (typeof i == "string" && i.startsWith(s))
-          for (const u of c)
-            u(void 0, i);
+function I(e, n, s) {
+  for (const [t, o] of n) {
+    const r = e.t.get(t);
+    if (r)
+      for (const a of r)
+        a(o, t);
+    if (s.has(t)) {
+      const a = `${t}.`;
+      for (const [i, c] of e.t)
+        if (typeof i == "string" && i.startsWith(a))
+          for (const l of c)
+            l(void 0, i);
     }
   }
+  if (e.r.size > 0) {
+    const t = u(
+      K(n.entries()).map(([r, a]) => u([r, a ?? null])).concat(K(s).map((r) => u([r, null])))
+    ), o = u(
+      t.filter(([, r]) => typeof r != "object" || r === null || H(r))
+    );
+    for (const [r, a] of e.r)
+      r(a ? t : o);
+  }
 }
-function W(e, ...n) {
-  const a = x(e), t = /* @__PURE__ */ new Map(), r = /* @__PURE__ */ new Set();
-  for (const [o, s] of n)
-    A(e, a, o, s, t, r);
-  O(a, t, r);
+function X(e, ...n) {
+  const s = x(e), t = /* @__PURE__ */ new Map(), o = /* @__PURE__ */ new Set();
+  for (const [r, a] of n)
+    _(e, s, r, a, t, o);
+  I(s, t, o);
 }
-function j(e, n) {
-  const a = x(e), t = /* @__PURE__ */ new Map(), r = /* @__PURE__ */ new Set();
-  A(e, a, "", n, t, r), O(a, t, r);
+function W(e, n) {
+  const s = x(e), t = /* @__PURE__ */ new Map(), o = /* @__PURE__ */ new Set();
+  _(e, s, "", n, t, o), I(s, t, o);
 }
-function z(e, n, a) {
-  return j(e, n()), w(e, "", () => {
-    a(V(e, ""));
+function Y(e, n, s) {
+  return W(e, n()), j(e, "", () => {
+    s(O(e, ""));
   });
+}
+function Z(e) {
+  return w(e, { [V]: !0 });
+}
+function H(e) {
+  return typeof e == "object" && e !== null && e[V] === !0;
 }
 /* v8 ignore start -- @preserve */
 export {
-  R as computed,
-  U as createStore,
-  E as destroyStore,
-  H as focus,
-  I as isStore,
-  w as listen,
-  j as patch,
-  V as peek,
-  z as sync,
-  W as update
+  Q as computed,
+  L as createStore,
+  D as destroyStore,
+  J as focus,
+  H as isAtom,
+  N as isStore,
+  j as listen,
+  G as listenAll,
+  W as patch,
+  O as peek,
+  Z as setAtom,
+  Y as sync,
+  X as update
 };
 //# sourceMappingURL=core.js.map
