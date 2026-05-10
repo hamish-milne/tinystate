@@ -1,8 +1,21 @@
 type Primitive = string | number | boolean | null | undefined;
+declare const atom: unique symbol;
+/**
+ * A unique marker type to identify objects that should be treated as atomic values in patches, even if they are objects or arrays.
+ * See {@link setAtom} for how to create Atom objects.
+ */
+export type Atom = {
+    [atom]: true;
+};
+/**
+ * A type that represents an object of type `T` marked as an Atom.
+ */
+export type AtomOf<T extends object> = T & Atom;
+type AtomicValue = Atom | Primitive;
 /**
  * A value that can be stored in the state: a primitive, a readonly object of `StateValue`s, or a readonly array of `StateValue`s.
  */
-export type StateValue = Primitive | StateObject | StateArray;
+export type StateValue = AtomicValue | StateObject | StateArray;
 type StateObject = {
     readonly [key in string | number]?: StateValue;
 };
@@ -10,7 +23,7 @@ type StateArray = readonly StateValue[];
 export type StateConstraint = unknown;
 type Stringify<T> = T extends symbol ? never : T;
 type ConcatPath<Prefix extends PropertyKey, Suffix extends PropertyKey> = Prefix extends "" ? Suffix : Suffix extends "" ? Prefix : `${Stringify<Prefix>}.${Stringify<Suffix>}`;
-type IsRecursive<T> = T extends Primitive ? false : T extends T[keyof T] ? true : false;
+type IsRecursive<T> = T extends AtomicValue ? false : T extends T[keyof T] ? true : false;
 type UnionToIntersection<U> = (U extends any ? (x: U) => void : never) extends (x: infer I) => void ? I : never;
 type AllKeys<T> = keyof {
     [U in T as U extends readonly unknown[] ? Extract<keyof U, number | "length"> : keyof U]: unknown;
@@ -26,7 +39,7 @@ type MergeUnionObject<T> = {
 type OrUndefined<T> = {
     [K in keyof T]: T[K] | undefined;
 };
-type MergeUnion<T> = Extract<T, Primitive> extends never ? MergeUnionObject<T> : OrUndefined<MergeUnionObject<Exclude<T, Primitive>>>;
+type MergeUnion<T> = Extract<T, AtomicValue> extends never ? MergeUnionObject<T> : OrUndefined<MergeUnionObject<Exclude<T, AtomicValue>>>;
 /**
  * A mapping of all possible paths in `T` to their corresponding value types.
  * @example
@@ -169,6 +182,15 @@ export declare function peek<T extends AnyState, P extends keyof T>(store: Store
  * @returns A function to unregister the listener
  */
 export declare function listen<T extends AnyState, P extends keyof T>(store: StoreView<T>, path: P, listener: (value: T[P], path: P) => void, initialNotify?: boolean): () => void;
+/**
+ * Registers a listener function that is called whenever any value in the store changes.
+ * The listener receives an array of path-value pairs representing all changed paths and their new values (with `null` for deleted keys).
+ * @param store The Store object
+ * @param listener The listener function to call on changes
+ * @param includeObjects Whether to include changes to object and array values (default: false). If false, only changes to primitive values will be included.
+ * @returns A function to unregister the listener
+ */
+export declare function listenAll<T extends AnyState>(store: StoreView<T>, listener: (pairs: readonly Readonly<ListenPair<T>>[]) => void, includeObjects?: boolean): () => void;
 type Numberify<T> = T extends `${number}` ? number : T;
 /**
  * Type that represents a sub-store focused on the state at the specified path prefix.
@@ -191,24 +213,30 @@ export declare function focus<T extends Record<PropertyKey, StateConstraint>, P 
  */
 export declare function computed<T extends AnyState, P extends keyof T, V extends StateConstraint>(store: StoreView<T>, path: P, computeFn: (stateValue: T[P]) => V): StoreViewOf<V>;
 /**
- * A tuple representing a path and its corresponding value in the store's state.
+ * A tuple representing a path and its corresponding patch value, used for batch updates in the `update` function.
+ */
+export type PatchPair<T extends AnyState> = {
+    [K in keyof T]: readonly [K, PatchValue<T[K]>];
+}[keyof T];
+/**
+ * A tuple representing a path and its corresponding value type, used for listening to changes in the `listen` function.
  * @example
  * ```ts
  * type State = { foo: number; bar: string };
- * type Pair = PathPair<State>;
+ * type Pair = ListenPair<State>;
  * // Result: ["foo", number] | ["bar", string]
  * ```
  */
-export type PathPair<T extends AnyState> = {
-    [K in keyof T]: readonly [K, PatchValue<T[K]>];
+export type ListenPair<T extends AnyState> = {
+    [K in keyof T]: readonly [K, T[K] | null];
 }[keyof T];
 /**
  * Sets multiple values in the store's state in a single batch operation.
  * @param store The Store object
  * @param replacements Tuples of path-value pairs to set in the store
  */
-export declare function update<T extends AnyState>(store: Store<T>, ...replacements: PathPair<T>[]): void;
-type PatchSpec<T> = null | undefined | (T extends Primitive ? T : T extends readonly unknown[] ? {
+export declare function update<T extends AnyState>(store: Store<T>, ...replacements: PatchPair<T>[]): void;
+type PatchSpec<T> = null | undefined | (T extends AtomicValue ? T : T extends readonly unknown[] ? {
     readonly [K in number | "length"]?: PatchSpecOrFunction<T[K]>;
 } | T : {
     readonly [K in keyof T]?: PatchSpecOrFunction<T[K]>;
@@ -234,4 +262,17 @@ export declare function patch<T extends AnyState>(store: Store<T>, patchValue: P
  * @returns A Store object that syncs with the external source
  */
 export declare function sync<T extends StateConstraint>(store: StoreOf<T>, getter: () => PatchValue<T>, setter: (value: T) => void): () => void;
+/**
+ * Marks an object as an atom, which is always treated as a primitive value in patches, even if it is an object or array.
+ * This is useful for cases where you want to replace an entire object or array rather than merging it.
+ * @param value The object to mark as an atom
+ * @returns The same object with an atom marker
+ */
+export declare function setAtom<T extends object>(value: T): AtomOf<T>;
+/**
+ * Checks if a value is an atom, meaning it has been marked with the atom marker and should be treated as a primitive value in patches.
+ * @param value The value to check
+ * @returns True if the value is an atom, false otherwise
+ */
+export declare function isAtom<T extends object>(value: T): value is AtomOf<T>;
 export {};
