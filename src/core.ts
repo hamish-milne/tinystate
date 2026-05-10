@@ -287,6 +287,16 @@ interface StoreImpl {
   readonly _extListeners: Map<(pairs: readonly any[]) => void, boolean>;
 }
 
+const {
+  freeze,
+  preventExtensions,
+  entries: objectEntries,
+  fromEntries,
+  keys: objectKeys,
+  assign,
+} = Object;
+const { isArray, from: arrayFrom } = Array;
+
 // Maps Store objects to their implementations
 const implMap = new WeakMap<StoreView, StoreImpl>();
 
@@ -335,12 +345,12 @@ export function createStore<T extends StateConstraint, M extends boolean = true>
   if (typeof factory === "function") {
     return (factory as () => StoreViewOf<T, M>)();
   }
-  const store = Object.freeze<StoreViewOf<T, M>>({
-    [brand]: Object.freeze([true as M, null as unknown as PathMap<T>] as const),
+  const store = freeze<StoreViewOf<T, M>>({
+    [brand]: freeze([true as M, null as unknown as PathMap<T>] as const),
     root: null,
     prefix: "",
   });
-  const storeImpl = Object.preventExtensions<StoreImpl>({
+  const storeImpl = preventExtensions<StoreImpl>({
     _state: patchStateValue(null, "", factory as StateValue, null, null),
     _listeners: new Map(),
     _extListeners: new Map(),
@@ -457,7 +467,7 @@ export function focus<
   if (path === "") {
     return store as StoreView<Focus<T, P>, M>;
   }
-  return Object.freeze<StoreView<Focus<T, P>, M>>({
+  return freeze<StoreView<Focus<T, P>, M>>({
     [brand]: store[brand] as [M, Focus<T, P>],
     root: store.root || store,
     prefix: concatPath(store.prefix, path),
@@ -534,8 +544,8 @@ function patchStateValue(
       }
       // Finished iterating over keys; check for changes
       if (changes.length > 0) {
-        const oldEntries = current && typeof current === "object" ? Object.entries(current) : [];
-        if (Array.isArray(current)) {
+        const oldEntries = current && typeof current === "object" ? objectEntries(current) : [];
+        if (isArray(current)) {
           oldEntries.push(["length", current.length]);
         }
         const changesMap = new Map(oldEntries);
@@ -546,10 +556,8 @@ function patchStateValue(
             changesMap.set(k, v);
           }
         }
-        const newObj = Object.fromEntries(changesMap);
-        newValue = Object.freeze(
-          typeof newObj.length === "number" ? Object.assign([], newObj) : newObj,
-        );
+        const newObj = fromEntries(changesMap);
+        newValue = freeze(typeof newObj.length === "number" ? assign([], newObj) : newObj);
       }
       // If no changes, keep the current value
     } else if (current === next) {
@@ -565,8 +573,8 @@ function patchStateValue(
         throw new Error(`Circular reference detected at path "${path as string}"`);
       }
       recursionCheck.add(next);
-      const keys = Object.keys(next).reverse();
-      if (Array.isArray(next)) {
+      const keys = objectKeys(next).reverse();
+      if (isArray(next)) {
         keys.push("length");
       }
       stack[stack.length - 1][4] = keys;
@@ -633,12 +641,12 @@ function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>, removedObje
     }
   }
   if (impl._extListeners.size > 0) {
-    const pairs = Object.freeze(
-      Array.from(notify.entries())
-        .map(([key, value]) => Object.freeze([key, value ?? null] as const))
-        .concat(Array.from(removedObjects).map((key) => Object.freeze([key, null] as const))),
+    const pairs = freeze(
+      arrayFrom(notify.entries())
+        .map(([key, value]) => freeze([key, value ?? null] as const))
+        .concat(arrayFrom(removedObjects).map((key) => freeze([key, null] as const))),
     );
-    const primitivePairs = Object.freeze(
+    const primitivePairs = freeze(
       pairs.filter(([, value]) => typeof value !== "object" || value === null || isAtom(value)),
     );
     for (const [listener, includeObjects] of impl._extListeners) {
@@ -739,7 +747,7 @@ export function sync<T extends StateConstraint>(
  * @returns The same object with an atom marker
  */
 export function setAtom<T extends object>(value: T): AtomOf<T> {
-  return Object.assign(value, { [atom]: true as const });
+  return assign(value, { [atom]: true as const });
 }
 
 /**
