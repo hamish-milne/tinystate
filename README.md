@@ -366,6 +366,29 @@ peek(store, 'invalid.path');        // Type error!
 patch(store, { user: { name: 123 } }); // Type error!
 ```
 
+## Cross-thread Synchronization
+
+tinystate's core is framework-agnostic and can be used in web workers or other threads. Use `listenAll` to synchronize state across threads:
+
+```ts
+// In main thread
+import { createStore, listenAll, peek } from 'tinystate';
+const store = createStore({ count: 0 });
+// Send initial state to worker
+worker.postMessage(["", peek(store)]);
+listenAll(store, (changes) => {
+  // Send changes to worker
+  worker.postMessage(changes);
+});
+
+// In worker
+import { createStore, update } from 'tinystate/core';
+const store = createStore({ count: 0 });
+onmessage = (event) => {
+  update(store, ...event.data);
+};
+```
+
 ## Quirks & Caveats
 
 - Only JSON-serializable data types are supported (no functions, Dates, Maps, Sets, etc.)

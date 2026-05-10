@@ -268,6 +268,8 @@ interface StoreImpl {
   _state: StateValue;
   // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
   readonly _listeners: Map<PropertyKey, Set<(value: any, path: any) => void>>;
+  // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
+  readonly _extListeners: Map<(pairs: readonly any[]) => void, boolean>;
 }
 
 // Maps Store objects to their implementations
@@ -326,6 +328,7 @@ export function createStore<T extends StateConstraint, M extends boolean = true>
   const storeImpl = Object.preventExtensions<StoreImpl>({
     _state: patchStateValue(null, "", factory as StateValue, null, null),
     _listeners: new Map(),
+    _extListeners: new Map(),
   });
   implMap.set(store, storeImpl);
   return store;
@@ -390,6 +393,24 @@ export function listen<T extends AnyState, P extends keyof T>(
     listener(peek(store, path), path);
   }
   return () => listeners.delete(listener);
+}
+
+/**
+ * Registers a listener function that is called whenever any value in the store changes.
+ * The listener receives an array of path-value pairs representing all changed paths and their new values (with `null` for deleted keys).
+ * @param store The Store object
+ * @param listener The listener function to call on changes
+ * @param includeObjects Whether to include changes to object and array values (default: false). If false, only changes to primitive values will be included.
+ * @returns A function to unregister the listener
+ */
+export function listenAll<T extends AnyState>(
+  store: StoreView<T>,
+  listener: (pairs: readonly Readonly<PathPair<T>>[]) => void,
+  includeObjects = false,
+): () => void {
+  const { _extListeners } = getImpl(store);
+  _extListeners.set(listener, includeObjects);
+  return () => _extListeners.delete(listener);
 }
 
 type Numberify<T> = T extends `${number}` ? number : T;
@@ -596,6 +617,19 @@ function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>, removedObje
       }
     }
   }
+  if (impl._extListeners.size > 0) {
+    const pairs = Object.freeze(
+      Array.from(notify.entries())
+        .map(([key, value]) => Object.freeze([key, value ?? null] as const))
+        .concat(Array.from(removedObjects).map((key) => Object.freeze([key, null] as const))),
+    );
+    const primitivePairs = Object.freeze(
+      pairs.filter(([, value]) => typeof value !== "object" || value === null),
+    );
+    for (const [listener, includeObjects] of impl._extListeners) {
+      listener(includeObjects ? pairs : primitivePairs);
+    }
+  }
 }
 
 /**
@@ -765,6 +799,38 @@ if (import.meta.vitest) {
     update(store, ["a.2", 30]);
     expect(listener1).toHaveBeenCalledTimes(2);
     expect(listener2).toHaveBeenCalledTimes(2);
+  });
+
+  test("listenAll to all state changes", () => {
+    const store = createStore({ a: 1, b: { c: 2 }, d: 3, e: { f: 4 } });
+    const listener = vi.fn();
+    const listenerWithObjects = vi.fn();
+    const unsubscribe = listenAll(store, listener);
+    const unsubscribeWithObjects = listenAll(store, listenerWithObjects, true);
+    update(store, ["a", 10], ["b.c", 20], ["d", null], ["e", null]);
+    expect(listenerWithObjects).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        ["a", 10],
+        ["b.c", 20],
+        ["b", { c: 20 }],
+        ["d", null],
+        ["e", null],
+        ["", { a: 10, b: { c: 20 } }],
+      ]),
+    );
+    expect(listener).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        ["a", 10],
+        ["b.c", 20],
+        ["d", null],
+        ["e", null],
+      ]),
+    );
+    unsubscribe();
+    unsubscribeWithObjects();
+    update(store, ["a", 30]);
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listenerWithObjects).toHaveBeenCalledTimes(1);
   });
 
   test("circular reference detection", () => {
