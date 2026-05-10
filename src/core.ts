@@ -2,10 +2,25 @@ type Assert<Actual extends Expected, Expected> = Actual;
 
 type Primitive = string | number | boolean | null | undefined;
 
+const atom = Symbol("atom");
+
+/**
+ * A unique marker type to identify objects that should be treated as atomic values in patches, even if they are objects or arrays.
+ * See {@link setAtom} for how to create Atom objects.
+ */
+export type Atom = { [atom]: true };
+
+/**
+ * A type that represents an object of type `T` marked as an Atom.
+ */
+export type AtomOf<T extends object> = T & Atom;
+
+type AtomicValue = Atom | Primitive;
+
 /**
  * A value that can be stored in the state: a primitive, a readonly object of `StateValue`s, or a readonly array of `StateValue`s.
  */
-export type StateValue = Primitive | StateObject | StateArray;
+export type StateValue = AtomicValue | StateObject | StateArray;
 type StateObject = { readonly [key in string | number]?: StateValue };
 type StateArray = readonly StateValue[];
 
@@ -26,7 +41,7 @@ type ConcatPath<Prefix extends PropertyKey, Suffix extends PropertyKey> = Prefix
 
 // Determines if `T` is recursive (i.e., contains itself as a property) to prevent infinite path expansion.
 // Note that this doesn't detect indirect recursion.
-type IsRecursive<T> = T extends Primitive ? false : T extends T[keyof T] ? true : false;
+type IsRecursive<T> = T extends AtomicValue ? false : T extends T[keyof T] ? true : false;
 
 type _Test_IsRecursive1 = Assert<
   // biome-ignore lint/suspicious/noExplicitAny: for testing
@@ -61,9 +76,9 @@ type MergeUnionObject<T> = { [K in AllKeys<T>]: OptionalKey<T, K> };
 type OrUndefined<T> = { [K in keyof T]: T[K] | undefined };
 
 type MergeUnion<T> =
-  Extract<T, Primitive> extends never
+  Extract<T, AtomicValue> extends never
     ? MergeUnionObject<T>
-    : OrUndefined<MergeUnionObject<Exclude<T, Primitive>>>;
+    : OrUndefined<MergeUnionObject<Exclude<T, AtomicValue>>>;
 
 type _Test_MergeUnion1 = Assert<
   MergeUnion<{ a: { x: number }; b: { y: string } } | { a: { z: boolean }; c: { w: number[] } }>,
@@ -405,7 +420,7 @@ export function listen<T extends AnyState, P extends keyof T>(
  */
 export function listenAll<T extends AnyState>(
   store: StoreView<T>,
-  listener: (pairs: readonly Readonly<PathPair<T>>[]) => void,
+  listener: (pairs: readonly Readonly<ListenPair<T>>[]) => void,
   includeObjects = false,
 ): () => void {
   const { _extListeners } = getImpl(store);
@@ -539,7 +554,7 @@ function patchStateValue(
       // If no changes, keep the current value
     } else if (current === next) {
       // No changes
-    } else if (typeof next !== "object" || !next) {
+    } else if (typeof next !== "object" || !next || isAtom(next)) {
       newValue = next;
       if (typeof current === "object" && current && removedObjects) {
         removedObjects.add(path);
@@ -633,16 +648,23 @@ function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>, removedObje
 }
 
 /**
- * A tuple representing a path and its corresponding value in the store's state.
+ * A tuple representing a path and its corresponding patch value, used for batch updates in the `update` function.
+ */
+export type PatchPair<T extends AnyState> = {
+  [K in keyof T]: readonly [K, PatchValue<T[K]>];
+}[keyof T];
+
+/**
+ * A tuple representing a path and its corresponding value type, used for listening to changes in the `listen` function.
  * @example
  * ```ts
  * type State = { foo: number; bar: string };
- * type Pair = PathPair<State>;
+ * type Pair = ListenPair<State>;
  * // Result: ["foo", number] | ["bar", string]
  * ```
  */
-export type PathPair<T extends AnyState> = {
-  [K in keyof T]: readonly [K, PatchValue<T[K]>];
+export type ListenPair<T extends AnyState> = {
+  [K in keyof T]: readonly [K, T[K] | null];
 }[keyof T];
 
 /**
@@ -650,7 +672,7 @@ export type PathPair<T extends AnyState> = {
  * @param store The Store object
  * @param replacements Tuples of path-value pairs to set in the store
  */
-export function update<T extends AnyState>(store: Store<T>, ...replacements: PathPair<T>[]): void {
+export function update<T extends AnyState>(store: Store<T>, ...replacements: PatchPair<T>[]): void {
   const storeImpl = getImpl(store);
   const notify = new Map<Key, StateValue>();
   const removedObjects = new Set<Key>();
@@ -664,7 +686,7 @@ export function update<T extends AnyState>(store: Store<T>, ...replacements: Pat
 type PatchSpec<T> =
   | null
   | undefined
-  | (T extends Primitive
+  | (T extends AtomicValue
       ? T
       : T extends readonly unknown[]
         ? { readonly [K in number | "length"]?: PatchSpecOrFunction<T[K]> } | T
@@ -708,6 +730,25 @@ export function sync<T extends StateConstraint>(
   return listen(store, "", () => {
     setter(peek(store, ""));
   });
+}
+
+/**
+ * Marks an object as an atom, which is always treated as a primitive value in patches, even if it is an object or array.
+ * This is useful for cases where you want to replace an entire object or array rather than merging it.
+ * @param value The object to mark as an atom
+ * @returns The same object with an atom marker
+ */
+export function setAtom<T extends object>(value: T): AtomOf<T> {
+  return Object.assign(value, { [atom]: true as const });
+}
+
+/**
+ * Checks if a value is an atom, meaning it has been marked with the atom marker and should be treated as a primitive value in patches.
+ * @param value The value to check
+ * @returns True if the value is an atom, false otherwise
+ */
+export function isAtom<T extends object>(value: T): value is AtomOf<T> {
+  return typeof value === "object" && value !== null && (value as AtomOf<T>)[atom] === true;
 }
 
 /* v8 ignore start -- @preserve */
@@ -777,6 +818,18 @@ if (import.meta.vitest) {
     expect(peek(store, "")).toEqual([2, 4, 6]);
     patch(store, { 0: (prev) => prev + 10 });
     expect(peek(store, "")).toEqual([12, 4, 6]);
+  });
+
+  test("atomic patch", () => {
+    const store = createStore({
+      a: { b: 1, c: 2 } as AtomOf<Uint8Array> | { b: number; c: number },
+    });
+    const newObj = setAtom({ b: 10, c: 20 });
+    patch(store, { a: newObj });
+    expect(peek(store, "a")).toBe(newObj);
+    const newArr = setAtom(new Uint8Array([1, 2, 3]));
+    patch(store, { a: newArr });
+    expect(peek(store, "a")).toBe(newArr);
   });
 
   test("listen to state changes", () => {

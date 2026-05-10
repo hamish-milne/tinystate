@@ -1,8 +1,8 @@
 import type { StandardSchemaV1 } from "@standard-schema/spec";
 import {
+  type PatchPair,
   type PathMap,
   type PathOf,
-  type PathPair,
   type StateConstraint,
   type StateValue,
   type Store,
@@ -50,14 +50,14 @@ export async function validate<T extends StateConstraint, TResult extends StateC
         ["issues", null] as const,
         ...issues.map(([path, issue]) => [`issues.${path}`, issue] as const),
         ["validated", null] as const,
-      ] as PathPair<ValidationResult<T, TResult>>[]),
+      ] as PatchPair<ValidationResult<T, TResult>>[]),
     );
     return undefined;
   }
   update(
     metaStore,
-    ["issues", null] as const as PathPair<ValidationResult<T, TResult>>,
-    ["validated", result.value] as const as PathPair<ValidationResult<T, TResult>>,
+    ["issues", null] as const as PatchPair<ValidationResult<T, TResult>>,
+    ["validated", result.value] as const as PatchPair<ValidationResult<T, TResult>>,
   );
   return result.value;
 }

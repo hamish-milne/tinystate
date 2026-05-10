@@ -11,12 +11,13 @@ Core:
     ✔ 'validate' function @done(25-11-13 22:58)
     ✘ Deferred updates @cancelled(25-11-23 17:20)
         We have 'update' for bulk actions; the rest is handled by the framework anyway
-    ☐ 'atom' symbol
+    ✔ 'atom' symbol @done(26-05-10 13:57)
     ✔ Support partial and `|undefined` state types @done(25-11-23 17:20)
     ✘ Default values for `peek` and friends @cancelled(25-11-23 17:20)
         Default values break referential equality; we have initial values and/or call site validation
     ✔ Functions with `calc` parameter use `useCallback` automatically @done(25-11-23 17:31)
     ✔ Allow updater functions in patch @done(25-12-02 18:14)
+    ✔ State synchronisation with `listenAll` @done(26-05-10 13:57)
 Form:
     ✔ Field @done(25-11-10 23:18)
     ✔ Checkbox @done(25-11-10 23:18)
