@@ -639,7 +639,7 @@ function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>, removedObje
         .concat(Array.from(removedObjects).map((key) => Object.freeze([key, null] as const))),
     );
     const primitivePairs = Object.freeze(
-      pairs.filter(([, value]) => typeof value !== "object" || value === null),
+      pairs.filter(([, value]) => typeof value !== "object" || value === null || isAtom(value)),
     );
     for (const [listener, includeObjects] of impl._extListeners) {
       listener(includeObjects ? pairs : primitivePairs);
@@ -855,12 +855,18 @@ if (import.meta.vitest) {
   });
 
   test("listenAll to all state changes", () => {
-    const store = createStore({ a: 1, b: { c: 2 }, d: 3, e: { f: 4 } });
+    const store = createStore({
+      a: 1,
+      b: { c: 2 },
+      d: 3,
+      e: { f: 4 },
+      g: undefined as undefined | AtomOf<{ h: number }>,
+    });
     const listener = vi.fn();
     const listenerWithObjects = vi.fn();
     const unsubscribe = listenAll(store, listener);
     const unsubscribeWithObjects = listenAll(store, listenerWithObjects, true);
-    update(store, ["a", 10], ["b.c", 20], ["d", null], ["e", null]);
+    update(store, ["a", 10], ["b.c", 20], ["d", null], ["e", null], ["g", setAtom({ h: 5 })]);
     expect(listenerWithObjects).toHaveBeenCalledWith(
       expect.arrayContaining([
         ["a", 10],
@@ -868,7 +874,8 @@ if (import.meta.vitest) {
         ["b", { c: 20 }],
         ["d", null],
         ["e", null],
-        ["", { a: 10, b: { c: 20 } }],
+        ["g", setAtom({ h: 5 })],
+        ["", { a: 10, b: { c: 20 }, g: setAtom({ h: 5 }) }],
       ]),
     );
     expect(listener).toHaveBeenCalledWith(
@@ -877,6 +884,7 @@ if (import.meta.vitest) {
         ["b.c", 20],
         ["d", null],
         ["e", null],
+        ["g", setAtom({ h: 5 })],
       ]),
     );
     unsubscribe();
