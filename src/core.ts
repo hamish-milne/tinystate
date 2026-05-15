@@ -632,7 +632,11 @@ function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>, removedObje
     if (removedObjects.has(changedPath)) {
       const prefix = `${changedPath}.`;
       for (const [listenerPath, listeners] of impl._listeners) {
-        if (typeof listenerPath === "string" && listenerPath.startsWith(prefix)) {
+        if (
+          !notify.has(listenerPath as Key) &&
+          typeof listenerPath === "string" &&
+          listenerPath.startsWith(prefix)
+        ) {
           for (const listener of listeners) {
             listener(undefined, listenerPath);
           }
@@ -946,6 +950,19 @@ if (import.meta.vitest) {
     patch(store, { a: 43 });
     expect(listener).toHaveBeenCalledWith(undefined, "a.b");
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  test("update with does not notify intermediate changes", () => {
+    const store = createStore({ a: { b: 1 } as number | { b: number } });
+    const listener = vi.fn();
+    const listener2 = vi.fn();
+    listen(store, "a", listener);
+    listen(store, "a.b", listener2);
+    update(store, ["a", 2], ["a", { b: 3 }]);
+    expect(listener).toHaveBeenCalledWith({ b: 3 }, "a");
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener2).toHaveBeenCalledWith(3, "a.b");
+    expect(listener2).toHaveBeenCalledTimes(1);
   });
 
   test("focus creates sub-store", () => {
