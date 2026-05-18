@@ -103,11 +103,11 @@ function j(e, t, s, n, r) {
       if (v.length > 0) {
         const k = c && typeof c == "object" ? E(c) : [];
         w(c) && k.push(["length", c.length]);
-        const S = new Map(k);
+        const h = new Map(k);
         for (const [M, T] of v)
-          T === null ? S.delete(M) : T !== void 0 && S.set(M, T);
-        const h = F(S);
-        p = u(typeof h.length == "number" ? A([], h) : h);
+          T === null ? h.delete(M) : T !== void 0 && h.set(M, T);
+        const S = F(h);
+        p = u(typeof S.length == "number" ? A([], S) : S);
       }
     } else if (c !== l)
       if (typeof l != "object" || !l || I(l))
@@ -143,7 +143,6 @@ function N(e) {
       const [o, a] = e.t[r];
       e.r = j(e.r, o, a, t, s);
     }
-    e.t.splice(0, n);
     for (const [r, o] of t) {
       const a = e.n.get(r);
       if (a)
@@ -166,17 +165,18 @@ function N(e) {
       for (const [a, i] of e.o)
         a(i ? r : o);
     }
+    e.t.splice(0, n);
   }
 }
 function X(e, ...t) {
-  const s = x(e);
-  for (const [n, r] of t)
-    s.t.push([b(e.prefix, n), r]);
-  U(s);
+  const s = x(e), n = s.t.length > 0;
+  for (const [r, o] of t)
+    s.t.push([b(e.prefix, r), o]);
+  n || U(s);
 }
 function _(e, t) {
-  const s = x(e);
-  s.t.push([e.prefix, t]), U(s);
+  const s = x(e), n = s.t.length > 0;
+  s.t.push([e.prefix, t]), n || U(s);
 }
 function Y(e, t, s) {
   return _(e, t()), C(e, "", () => {
