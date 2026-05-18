@@ -629,7 +629,6 @@ function processChangeQueue(impl: StoreImpl) {
       const [path, patch] = impl._queuedUpdates[i];
       impl._state = patchStateValue(impl._state, path, patch, notify, removedObjects);
     }
-    impl._queuedUpdates.splice(0, batchLength);
 
     for (const [changedPath, value] of notify) {
       const listeners = impl._listeners.get(changedPath);
@@ -664,6 +663,11 @@ function processChangeQueue(impl: StoreImpl) {
         listener(includeObjects ? pairs : primitivePairs);
       }
     }
+
+    // Important: remove the pending updates at the end of the loop, ensuring that any updates
+    // synchronously triggered by listeners will be processed in the next iteration rather than
+    // immediately, which ensures a predictable order of operations.
+    impl._queuedUpdates.splice(0, batchLength);
   }
 }
 
@@ -694,10 +698,13 @@ export type ListenPair<T extends AnyState> = {
  */
 export function update<T extends AnyState>(store: Store<T>, ...replacements: PatchPair<T>[]): void {
   const storeImpl = getImpl(store);
+  const isUpdating = storeImpl._queuedUpdates.length > 0;
   for (const [path, patch] of replacements) {
     storeImpl._queuedUpdates.push([concatPath(store.prefix, path), patch as AnyPatch]);
   }
-  applyChanges(storeImpl);
+  if (!isUpdating) {
+    applyChanges(storeImpl);
+  }
 }
 
 // Patch specification type for patchState. Equivalent to a 'deep partial' but does not affect arrays.
@@ -727,8 +734,11 @@ export type PatchValue<T> = T | PatchSpecOrFunction<T>;
  */
 export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValue<T[""]>): void {
   const storeImpl = getImpl(store);
+  const isUpdating = storeImpl._queuedUpdates.length > 0;
   storeImpl._queuedUpdates.push([store.prefix, patchValue as AnyPatch]);
-  applyChanges(storeImpl);
+  if (!isUpdating) {
+    applyChanges(storeImpl);
+  }
 }
 
 /**
@@ -977,8 +987,8 @@ if (import.meta.vitest) {
     const listenerFn = vi.fn();
     listen(store, "", listenerFn);
     patch(store, { a: 2 });
-    expect(listenerFn).toHaveBeenCalledWith({ a: 2, b: 1 }, "");
-    expect(listenerFn).toHaveBeenCalledWith({ a: 2, b: 3 }, "");
+    expect(listenerFn).nthCalledWith(1, { a: 2, b: 1 }, "");
+    expect(listenerFn).nthCalledWith(2, { a: 2, b: 3 }, "");
   });
 
   test("focus creates sub-store", () => {
