@@ -278,6 +278,8 @@ export type StoreViewOf<T extends StateConstraint, Mutable extends boolean = boo
  */
 export type StoreOf<T extends StateConstraint> = StoreViewOf<T, true>;
 
+type AnyPatch = StateValue | ((prev: StateValue) => StateValue);
+
 // Holds the actual mutable state and listeners for a Store
 interface StoreImpl {
   _state: StateValue;
@@ -285,6 +287,7 @@ interface StoreImpl {
   readonly _listeners: Map<PropertyKey, Set<(value: any, path: any) => void>>;
   // biome-ignore lint/suspicious/noExplicitAny: we can't restrict the type here
   readonly _extListeners: Map<(pairs: readonly any[]) => void, boolean>;
+  readonly _queuedUpdates: [PropertyKey, AnyPatch][];
 }
 
 const {
@@ -354,6 +357,7 @@ export function createStore<T extends StateConstraint, M extends boolean = true>
     _state: patchStateValue(null, "", factory as StateValue, null, null),
     _listeners: new Map(),
     _extListeners: new Map(),
+    _queuedUpdates: [],
   });
   implMap.set(store, storeImpl);
   return store;
@@ -602,59 +606,63 @@ function patchStateValue(
 
 type Key = string | number;
 
-function patchStore(
-  store: Store,
-  storeImpl: StoreImpl,
-  path: PropertyKey,
-  // biome-ignore lint/suspicious/noExplicitAny: called by generic functions
-  newValue: PatchValue<any>,
-  notify: Map<Key, StateValue>,
-  removedObjects: Set<Key>,
-) {
-  storeImpl._state = patchStateValue(
-    storeImpl._state,
-    concatPath(store.prefix, path),
-    newValue,
-    notify,
-    removedObjects,
-  );
+function applyChanges(impl: StoreImpl): void {
+  try {
+    processChangeQueue(impl);
+  } catch (error) {
+    // Clear the queue so it doesn't lock up
+    impl._queuedUpdates.length = 0;
+    throw error;
+  }
 }
 
-// Notifies listeners of changes recorded in the `notify` map
-function notifyChange(impl: StoreImpl, notify: Map<Key, StateValue>, removedObjects: Set<Key>) {
-  for (const [changedPath, value] of notify) {
-    const listeners = impl._listeners.get(changedPath);
-    if (listeners) {
-      for (const listener of listeners) {
-        listener(value, changedPath);
-      }
+function processChangeQueue(impl: StoreImpl) {
+  while (impl._queuedUpdates.length > 0) {
+    const notify = new Map<Key, StateValue>();
+    const removedObjects = new Set<Key>();
+    // Apply queued changes one 'batch' at a time.
+    // This ensures that if listeners synchronously trigger more changes,
+    // those will be processed in a separate batch after the current listeners have finished,
+    // preventing infinite loops and ensuring a predictable order of operations.
+    const batchLength = impl._queuedUpdates.length;
+    for (let i = 0; i < batchLength; i++) {
+      const [path, patch] = impl._queuedUpdates[i];
+      impl._state = patchStateValue(impl._state, path, patch, notify, removedObjects);
     }
-    if (removedObjects.has(changedPath)) {
-      const prefix = `${changedPath}.`;
-      for (const [listenerPath, listeners] of impl._listeners) {
-        if (
-          !notify.has(listenerPath as Key) &&
-          typeof listenerPath === "string" &&
-          listenerPath.startsWith(prefix)
-        ) {
-          for (const listener of listeners) {
-            listener(undefined, listenerPath);
+    impl._queuedUpdates.splice(0, batchLength);
+
+    for (const [changedPath, value] of notify) {
+      const listeners = impl._listeners.get(changedPath);
+      if (listeners) {
+        for (const listener of listeners) {
+          listener(value, changedPath);
+        }
+      }
+      if (removedObjects.has(changedPath)) {
+        const prefix = `${changedPath}.`;
+        for (const [listenerPath, listeners] of impl._listeners) {
+          if (
+            !notify.has(listenerPath as Key) &&
+            typeof listenerPath === "string" &&
+            listenerPath.startsWith(prefix)
+          ) {
+            for (const listener of listeners) {
+              listener(undefined, listenerPath);
+            }
           }
         }
       }
     }
-  }
-  if (impl._extListeners.size > 0) {
-    const pairs = freeze(
-      arrayFrom(notify.entries())
-        .map(([key, value]) => freeze([key, value ?? null] as const))
-        .concat(arrayFrom(removedObjects).map((key) => freeze([key, null] as const))),
-    );
-    const primitivePairs = freeze(
-      pairs.filter(([, value]) => typeof value !== "object" || value === null || isAtom(value)),
-    );
-    for (const [listener, includeObjects] of impl._extListeners) {
-      listener(includeObjects ? pairs : primitivePairs);
+    if (impl._extListeners.size > 0) {
+      const pairs = freeze(
+        arrayFrom(notify.entries()).map(([key, value]) => freeze([key, value ?? null] as const)),
+      );
+      const primitivePairs = freeze(
+        pairs.filter(([, value]) => typeof value !== "object" || value === null || isAtom(value)),
+      );
+      for (const [listener, includeObjects] of impl._extListeners) {
+        listener(includeObjects ? pairs : primitivePairs);
+      }
     }
   }
 }
@@ -686,12 +694,10 @@ export type ListenPair<T extends AnyState> = {
  */
 export function update<T extends AnyState>(store: Store<T>, ...replacements: PatchPair<T>[]): void {
   const storeImpl = getImpl(store);
-  const notify = new Map<Key, StateValue>();
-  const removedObjects = new Set<Key>();
-  for (const [path, value] of replacements) {
-    patchStore(store, storeImpl, path, value, notify, removedObjects);
+  for (const [path, patch] of replacements) {
+    storeImpl._queuedUpdates.push([concatPath(store.prefix, path), patch as AnyPatch]);
   }
-  notifyChange(storeImpl, notify, removedObjects);
+  applyChanges(storeImpl);
 }
 
 // Patch specification type for patchState. Equivalent to a 'deep partial' but does not affect arrays.
@@ -721,10 +727,8 @@ export type PatchValue<T> = T | PatchSpecOrFunction<T>;
  */
 export function patch<T extends AnyState>(store: Store<T>, patchValue: PatchValue<T[""]>): void {
   const storeImpl = getImpl(store);
-  const notify = new Map<Key, StateValue>();
-  const removedObjects = new Set<Key>();
-  patchStore(store, storeImpl, "", patchValue, notify, removedObjects);
-  notifyChange(storeImpl, notify, removedObjects);
+  storeImpl._queuedUpdates.push([store.prefix, patchValue as AnyPatch]);
+  applyChanges(storeImpl);
 }
 
 /**
@@ -963,6 +967,18 @@ if (import.meta.vitest) {
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listener2).toHaveBeenCalledWith(3, "a.b");
     expect(listener2).toHaveBeenCalledTimes(1);
+  });
+
+  test("update within listener notifies in sequence", () => {
+    const store = createStore({ a: 1, b: 1 });
+    listen(store, "a", (value) => {
+      patch(store, { b: value + 1 });
+    });
+    const listenerFn = vi.fn();
+    listen(store, "", listenerFn);
+    patch(store, { a: 2 });
+    expect(listenerFn).toHaveBeenCalledWith({ a: 2, b: 1 }, "");
+    expect(listenerFn).toHaveBeenCalledWith({ a: 2, b: 3 }, "");
   });
 
   test("focus creates sub-store", () => {
