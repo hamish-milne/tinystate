@@ -1,102 +1,117 @@
-import { listen as b, update as f } from "./core.js";
-const a = [HTMLInputElement], x = [...a, HTMLTextAreaElement, HTMLSelectElement];
-function u(o, n, e, t, r, s = "change") {
+import { listen as b, update as h } from "./core.js";
+const d = [HTMLInputElement], f = [HTMLSelectElement], x = [...d, HTMLTextAreaElement, ...f];
+function u(n, o, e, t, s, r = "change") {
   const p = ({ target: c }) => {
-    for (const i of r)
+    for (const i of s)
       if (c instanceof i) {
-        f(o, [n, e(c)]);
+        h(n, [o, e(c)]);
         break;
       }
   };
   return {
-    name: String(n),
-    id: String(n),
+    name: String(o),
+    id: String(o),
     ref(c) {
       if (c) {
-        c.addEventListener(s, p);
-        const i = b(o, n, (l) => t(c, l), !0);
+        c.addEventListener(r, p);
+        const i = b(n, o, (a) => t(c, a), !0);
         return () => {
-          c.removeEventListener(s, p), i();
+          c.removeEventListener(r, p), i();
         };
       }
     }
   };
 }
-function T(o, n, e, t) {
+function y(n, o, e, t) {
   return u(
-    o,
     n,
-    (r) => r[e],
-    (r, s) => {
-      r[e] = s ?? "";
+    o,
+    (s) => s[e],
+    (s, r) => {
+      s[e] = r ?? "";
     },
-    a,
+    d,
     t
   );
 }
-function k(o, n, e) {
+function O(n, o, e) {
   return u(
-    o,
     n,
+    o,
     (t) => t.value,
-    (t, r) => {
-      t.value = r ?? "";
+    (t, s) => {
+      t.value = s ?? "";
     },
     x,
     e
   );
 }
-function B(o, n) {
+function T(n, o) {
   return {
     ...u(
-      o,
       n,
+      o,
       (e) => e.checked,
       (e, t) => {
         e.checked = !!t;
       },
-      a
+      d
     ),
     type: "checkbox"
   };
 }
-function E(o, n, e) {
-  const t = [n, e].join(":");
+function v(n, o, e) {
+  const t = [o, e].join(":");
   return {
     ...u(
-      o,
       n,
-      (r) => (s) => r.checked ? Array.from(/* @__PURE__ */ new Set([...s, e])).sort() : s.filter((p) => p !== e),
-      (r, s) => {
-        r.checked = s.includes(e);
+      o,
+      (s) => (r) => s.checked ? Array.from(/* @__PURE__ */ new Set([...r, e])).sort() : r.filter((p) => p !== e),
+      (s, r) => {
+        s.checked = r.includes(e);
       },
-      a
+      d
     ),
     type: "checkbox",
     name: t,
     id: t
   };
 }
-function O(o, n, e) {
+function k(n, o, e) {
   return {
     ...u(
-      o,
       n,
+      o,
       (t) => t.checked ? e : void 0,
-      (t, r) => {
-        t.checked = r === e;
+      (t, s) => {
+        t.checked = s === e;
       },
-      a
+      d
     ),
     type: "radio",
     value: e
   };
 }
-function v(o, n) {
+function B(n, o) {
+  return {
+    ...u(
+      n,
+      o,
+      (e) => Array.from(e.selectedOptions).map((t) => t.value),
+      (e, t) => {
+        for (const s of Array.from(e.options))
+          s.selected = t.includes(s.value);
+      },
+      f
+    ),
+    multiple: !0
+  };
+}
+function P(n, o) {
   return {
     ref: u(
-      o,
       n,
+      o,
       (e) => e.open,
       (e, t) => {
         t ? e.showModal() : e.close();
@@ -107,11 +122,12 @@ function v(o, n) {
 }
 /* v8 ignore start -- @preserve */
 export {
-  v as dialogModal,
-  B as formCheckbox,
-  E as formCheckboxArray,
-  T as formField,
-  O as formRadio,
-  k as formText
+  P as dialogModal,
+  T as formCheckbox,
+  v as formCheckboxArray,
+  y as formField,
+  k as formRadio,
+  B as formSelectMultiple,
+  O as formText
 };
 //# sourceMappingURL=form.js.map

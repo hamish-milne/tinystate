@@ -40,7 +40,7 @@ export declare function formText<T extends string, P extends PropertyKey, TMetho
 }>, path: P, method?: TMethod): {
     name: string;
     id: string;
-    ref(node: HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement | null): (() => void) | undefined;
+    ref(node: HTMLTextAreaElement | HTMLInputElement | HTMLSelectElement | null): (() => void) | undefined;
 };
 /**
  * Creates props for a checkbox input that syncs with the store at the specified path.
@@ -101,6 +101,27 @@ export declare function formRadio<P extends PropertyKey, K extends string>(store
     name: string;
     id: string;
     ref(node: HTMLInputElement | null): (() => void) | undefined;
+};
+/**
+ * Creates props for a multiple-select input that syncs with an array in the store at the specified path.
+ * @param store The Store object
+ * @param path The path in the store to bind to
+ * @returns An object to be spread onto a select element
+ * @example
+ * ```tsx
+ * <select {...formSelectMultiple(store, "selectedItems")}>
+ *   <option value="item1">Item 1</option>
+ *   <option value="item2">Item 2</option>
+ * </select>
+ * ```
+ */
+export declare function formSelectMultiple<P extends PropertyKey, K extends string[]>(store: Store<{
+    [_ in P]: K;
+}>, path: P): {
+    multiple: boolean;
+    name: string;
+    id: string;
+    ref(node: HTMLSelectElement | null): (() => void) | undefined;
 };
 /**
  * Creates props for a dialog element that syncs its open state with the store at the specified path.
