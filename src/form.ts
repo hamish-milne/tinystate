@@ -3,7 +3,8 @@ import { listen, type PatchValue, peek, type StateConstraint, type Store, update
 export type MethodProp = "change" | "input" | "blur";
 
 const isInput = [HTMLInputElement];
-const isTextInput = [...isInput, HTMLTextAreaElement, HTMLSelectElement];
+const isSelect = [HTMLSelectElement];
+const isTextInput = [...isInput, HTMLTextAreaElement, ...isSelect];
 
 function formAny<
   TElement extends HTMLElement,
@@ -201,6 +202,38 @@ export function formRadio<P extends PropertyKey, K extends string>(
 }
 
 /**
+ * Creates props for a multiple-select input that syncs with an array in the store at the specified path.
+ * @param store The Store object
+ * @param path The path in the store to bind to
+ * @returns An object to be spread onto a select element
+ * @example
+ * ```tsx
+ * <select {...formSelectMultiple(store, "selectedItems")}>
+ *   <option value="item1">Item 1</option>
+ *   <option value="item2">Item 2</option>
+ * </select>
+ * ```
+ */
+export function formSelectMultiple<P extends PropertyKey, K extends string[]>(
+  store: Store<{ [_ in P]: K }>,
+  path: P,
+) {
+  return {
+    ...formAny(
+      store,
+      path,
+      (element) => Array.from(element.selectedOptions).map((option) => option.value as string),
+      (element, value) => {
+        for (const option of Array.from(element.options)) {
+          option.selected = value.includes(option.value);
+        }
+      },
+      isSelect,
+    ),
+    multiple: true,
+  };
+}
+/**
  * Creates props for a dialog element that syncs its open state with the store at the specified path.
  * @param store The Store object
  * @param path The path in the store to bind to
@@ -338,6 +371,44 @@ if (import.meta.vitest) {
     expect(peek(store, "color")).toBe("red");
     unsubscribeRed?.();
     unsubscribeBlue?.();
+  });
+
+  test("formSelectMultiple syncs array value", () => {
+    const store = createStore({ selected: [] as string[] });
+    const props = formSelectMultiple(store, "selected");
+    const select = document.createElement("select");
+    select.multiple = true;
+    for (const option of ["option1", "option2", "option3"]) {
+      const opt = document.createElement("option");
+      opt.value = option;
+      select.appendChild(opt);
+    }
+    Object.assign(select, props);
+    const unsubscribe = props.ref(select);
+
+    function updateSelectedOptions() {
+      // https://github.com/capricorn86/happy-dom/issues/1594
+      // Remove all child elements and re-add them
+      const children = Array.from(select.children);
+      select.textContent = "";
+      for (const child of children) {
+        select.appendChild(child);
+      }
+    }
+
+    expect(Array.from(select.selectedOptions).map((o) => o.value)).toEqual([]);
+    patch(store, { selected: ["option1", "option3"] });
+    updateSelectedOptions();
+    expect(Array.from(select.selectedOptions).map((o) => o.value)).toEqual(["option1", "option3"]);
+    select.options[1].selected = true; // Select option2
+    updateSelectedOptions();
+    fireEvent.change(select);
+    expect(peek(store, "selected")).toEqual(["option1", "option2", "option3"]);
+    select.options[0].selected = false; // Deselect option1
+    updateSelectedOptions();
+    fireEvent.change(select);
+    expect(peek(store, "selected")).toEqual(["option2", "option3"]);
+    unsubscribe?.();
   });
 
   test("dialogModal syncs dialog open state", () => {
