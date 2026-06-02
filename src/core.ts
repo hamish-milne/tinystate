@@ -442,6 +442,20 @@ export function listenAll<T extends AnyState>(
   return () => _extListeners.delete(listener);
 }
 
+/**
+ * Retrieves an array of all primitive path-value pairs in the store's state. This is useful for initially populating listeners registered with `listenAll`.
+ * @param store The Store object
+ * @returns An array of path-value pairs for all primitive values in the store's state
+ */
+export function getPrimitiveEntries<T extends AnyState>(store: StoreView<T>): ListenPair<T>[] {
+  const impl = getImpl(store);
+  const notify = new Map<PropertyKey, StateValue>();
+  patchStateValue(undefined, "", impl._state, notify, null);
+  return Array.from(notify.entries()).filter(
+    ([_key, value]) => typeof value !== "object" || value === null || isAtom(value),
+  ) as ListenPair<T>[];
+}
+
 type Numberify<T> = T extends `${number}` ? number : T;
 
 /**
@@ -918,6 +932,27 @@ if (import.meta.vitest) {
     update(store, ["a", 30]);
     expect(listener).toHaveBeenCalledTimes(1);
     expect(listenerWithObjects).toHaveBeenCalledTimes(1);
+  });
+
+  test("get primitive pairs", () => {
+    const store = createStore({
+      a: 1,
+      b: { c: 2, d: { e: 3 } },
+      f: [4, 5],
+      g: setAtom({ h: 6 }),
+    });
+    const entries = getPrimitiveEntries(store);
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        ["a", 1],
+        ["b.c", 2],
+        ["b.d.e", 3],
+        ["f.length", 2],
+        ["f.0", 4],
+        ["f.1", 5],
+        ["g", setAtom({ h: 6 })],
+      ]),
+    );
   });
 
   test("circular reference detection", () => {
