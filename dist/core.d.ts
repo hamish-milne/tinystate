@@ -191,6 +191,12 @@ export declare function listen<T extends AnyState, P extends keyof T>(store: Sto
  * @returns A function to unregister the listener
  */
 export declare function listenAll<T extends AnyState>(store: StoreView<T>, listener: (pairs: readonly Readonly<ListenPair<T>>[]) => void, includeObjects?: boolean): () => void;
+/**
+ * Retrieves an array of all primitive path-value pairs in the store's state. This is useful for initially populating listeners registered with `listenAll`.
+ * @param store The Store object
+ * @returns An array of path-value pairs for all primitive values in the store's state
+ */
+export declare function getPrimitiveEntries<T extends AnyState>(store: StoreView<T>): ListenPair<T>[];
 type Numberify<T> = T extends `${number}` ? number : T;
 /**
  * Type that represents a sub-store focused on the state at the specified path prefix.
