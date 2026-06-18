@@ -1,19 +1,32 @@
-import { listen, type PatchValue, peek, type StateConstraint, type Store, update } from "./core.js";
+import {
+  type AnyState,
+  listen,
+  type PatchValue,
+  type Primitive,
+  peek,
+  type StateConstraint,
+  type Store,
+  update,
+} from "./core.js";
 
 export type MethodProp = "change" | "input" | "blur";
 
 const isInput = [HTMLInputElement];
 const isSelect = [HTMLSelectElement];
-const isTextInput = [...isInput, HTMLTextAreaElement, ...isSelect];
+const isTextInput: { new (): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement }[] = [
+  ...isInput,
+  HTMLTextAreaElement,
+  ...isSelect,
+];
 
 function formAny<
   TElement extends HTMLElement,
   T extends StateConstraint,
-  P extends PropertyKey,
+  TStore extends AnyState,
   TMethod extends MethodProp = "change",
 >(
-  store: Store<{ [_ in P]: T }>,
-  path: P,
+  store: Store<TStore>,
+  path: PathsOfType<TStore, T>,
   getter: (element: TElement) => PatchValue<T>,
   setter: (element: TElement, value: T) => void,
   allowedTypes: { new (): TElement }[],
@@ -22,7 +35,7 @@ function formAny<
   const handler: EventListener = ({ target }) => {
     for (const Type of allowedTypes) {
       if (target instanceof Type) {
-        update(store, [path, getter(target)]);
+        update(store, [path, getter(target) as TStore[PathsOfType<TStore, T>]]);
         break;
       }
     }
@@ -43,6 +56,16 @@ function formAny<
   };
 }
 
+const emptyInput = {
+  valueAsNumber: NaN,
+  valueAsDate: null,
+  value: "",
+};
+
+type PathsOfType<TState extends AnyState, TValue> = {
+  [P in keyof TState]: NonNullable<TState[P]> extends TValue ? P : never;
+}[keyof TState];
+
 /**
  * Creates props for a form field that syncs with the store at the specified path.
  * @param store The Store object
@@ -57,16 +80,20 @@ function formAny<
  */
 export function formField<
   TValue extends "value" | "valueAsNumber" | "valueAsDate",
-  T extends NonNullable<HTMLInputElement[TValue]>,
-  P extends PropertyKey,
+  TStore extends AnyState,
   TMethod extends MethodProp = "change",
->(store: Store<{ [_ in P]: T }>, path: P, valueProp: TValue, method?: TMethod) {
+>(
+  store: Store<TStore>,
+  path: PathsOfType<TStore, HTMLInputElement[TValue]>,
+  valueProp: TValue,
+  method?: TMethod,
+) {
   return formAny(
     store,
     path,
-    (element) => element[valueProp] as T,
-    (element, value) => {
-      element[valueProp] = value ?? "";
+    (element) => element[valueProp],
+    (element, value = emptyInput[valueProp] as HTMLInputElement[TValue]) => {
+      element[valueProp] = value;
     },
     isInput,
     method,
@@ -89,17 +116,17 @@ export function formField<
  * </select>
  * ```
  */
-export function formText<
-  T extends string,
-  P extends PropertyKey,
-  TMethod extends MethodProp = "change",
->(store: Store<{ [_ in P]: T }>, path: P, method?: TMethod) {
-  return formAny<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, T, P, TMethod>(
+export function formText<TStore extends AnyState, TMethod extends MethodProp = "change">(
+  store: Store<TStore>,
+  path: PathsOfType<TStore, string>,
+  method?: TMethod,
+) {
+  return formAny(
     store,
     path,
-    (element) => element.value as T,
-    (element, value) => {
-      element.value = value ?? "";
+    (element) => element.value,
+    (element, value = "") => {
+      element.value = value;
     },
     isTextInput,
     method,
@@ -116,7 +143,10 @@ export function formText<
  * <input type="checkbox" {...formCheckbox(store, "isSubscribed")} />
  * ```
  */
-export function formCheckbox<P extends PropertyKey>(store: Store<{ [_ in P]: boolean }>, path: P) {
+export function formCheckbox<TStore extends AnyState>(
+  store: Store<TStore>,
+  path: PathsOfType<TStore, boolean>,
+) {
   return {
     ...formAny(
       store,
@@ -144,21 +174,25 @@ export function formCheckbox<P extends PropertyKey>(store: Store<{ [_ in P]: boo
  * <input type="checkbox" {...formCheckboxArray(store, "selectedItems", "item2")} /> Item 2
  * ```
  */
-export function formCheckboxArray<P extends PropertyKey, K extends StateConstraint>(
-  store: Store<{ [_ in P]: K[] }>,
+export function formCheckboxArray<
+  TStore extends AnyState,
+  P extends PathsOfType<TStore, Primitive[]>,
+>(
+  store: Store<TStore>,
   path: P,
-  option: K,
+  option: TStore[P] extends Primitive[] ? TStore[P][number] : never,
 ) {
-  const name = [path, option].join(":");
+  const name = `${String(path)}:${String(option)}`;
   return {
     ...formAny(
       store,
-      path,
-      (element) => (prev) =>
-        element.checked
-          ? Array.from(new Set([...prev, option])).sort()
-          : prev.filter((v) => v !== option),
-      (element, value) => {
+      path as PathsOfType<TStore, Primitive[]>,
+      (element) =>
+        (prev = []) =>
+          element.checked
+            ? Array.from(new Set([...prev, option])).sort()
+            : prev.filter((v) => v !== option),
+      (element, value = []) => {
         element.checked = value.includes(option);
       },
       isInput,
@@ -181,23 +215,23 @@ export function formCheckboxArray<P extends PropertyKey, K extends StateConstrai
  * <input type="radio" {...formRadio(store, "favoriteColor", "blue")} /> Blue
  * ```
  */
-export function formRadio<P extends PropertyKey, K extends string>(
-  store: Store<{ [_ in P]: K }>,
+export function formRadio<TStore extends AnyState, P extends PathsOfType<TStore, Primitive>>(
+  store: Store<TStore>,
   path: P,
-  option: K,
+  option: TStore[P],
 ) {
   return {
     ...formAny(
       store,
-      path,
-      (element) => (element.checked ? option : undefined),
+      path as PathsOfType<TStore, Primitive>,
+      (element) => (element.checked ? (option as Primitive) : undefined),
       (element, value) => {
         element.checked = value === option;
       },
       isInput,
     ),
     type: "radio",
-    value: option,
+    value: String(option),
   };
 }
 
@@ -214,16 +248,16 @@ export function formRadio<P extends PropertyKey, K extends string>(
  * </select>
  * ```
  */
-export function formSelectMultiple<P extends PropertyKey, K extends string[]>(
-  store: Store<{ [_ in P]: K }>,
-  path: P,
+export function formSelectMultiple<TStore extends AnyState>(
+  store: Store<TStore>,
+  path: PathsOfType<TStore, string[]>,
 ) {
   return {
     ...formAny(
       store,
       path,
-      (element) => Array.from(element.selectedOptions).map((option) => option.value as string),
-      (element, value) => {
+      (element) => Array.from(element.selectedOptions).map((option) => option.value),
+      (element, value = []) => {
         for (const option of Array.from(element.options)) {
           option.selected = value.includes(option.value);
         }
@@ -245,7 +279,10 @@ export function formSelectMultiple<P extends PropertyKey, K extends string[]>(
  * </dialog>
  * ```
  */
-export function dialogModal<P extends PropertyKey>(store: Store<{ [_ in P]: boolean }>, path: P) {
+export function dialogModal<TStore extends AnyState>(
+  store: Store<TStore>,
+  path: PathsOfType<TStore, boolean>,
+) {
   return {
     ref: formAny(
       store,
@@ -270,7 +307,7 @@ if (import.meta.vitest) {
   const { fireEvent } = await import("@testing-library/dom");
 
   test("formField syncs string value", () => {
-    const store = createStore({ name: "Alice" });
+    const store = createStore({ name: "Alice" as "Alice" | "Bob" | undefined });
     const props = formField(store, "name", "value");
     const input = document.createElement("input");
     Object.assign(input, props);
@@ -281,7 +318,7 @@ if (import.meta.vitest) {
     input.value = "Charlie";
     fireEvent.change(input);
     expect(peek(store, "name")).toBe("Charlie");
-    update(store, ["name", null as unknown as string]);
+    update(store, ["name", null]);
     expect(input.value).toBe("");
     unsubscribe?.();
   });
@@ -305,7 +342,7 @@ if (import.meta.vitest) {
     input.value = "Charlie";
     fireEvent.change(input);
     expect(peek(store, "name")).toBe("Charlie");
-    update(store, ["name", null as unknown as string]);
+    update(store, ["name", null]);
     expect(input.value).toBe("");
     unsubscribe?.();
   });
@@ -326,7 +363,7 @@ if (import.meta.vitest) {
   });
 
   test("formCheckboxArray syncs array value", () => {
-    const store = createStore({ selected: [] as string[] });
+    const store = createStore({ selected: [] as ("option1" | "option2" | "option3")[] });
     const propsOption1 = formCheckboxArray(store, "selected", "option1");
     const propsOption2 = formCheckboxArray(store, "selected", "option2");
     const inputOption1 = document.createElement("input");
@@ -351,7 +388,7 @@ if (import.meta.vitest) {
   });
 
   test("formRadio syncs string value", () => {
-    const store = createStore({ color: "red" as string });
+    const store = createStore({ color: "red" as "red" | "blue" });
     const propsRed = formRadio(store, "color", "red");
     const propsBlue = formRadio(store, "color", "blue");
     const inputRed = document.createElement("input");

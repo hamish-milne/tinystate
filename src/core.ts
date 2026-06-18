@@ -1,6 +1,6 @@
 type Assert<Actual extends Expected, Expected> = Actual;
 
-type Primitive = string | number | boolean | null | undefined;
+export type Primitive = string | number | boolean | null | undefined;
 
 const atom = Symbol("atom");
 
