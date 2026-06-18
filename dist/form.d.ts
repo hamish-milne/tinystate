@@ -1,5 +1,8 @@
-import { type StateConstraint, type Store } from "./core.js";
+import { type AnyState, type Primitive, type Store } from "./core.js";
 export type MethodProp = "change" | "input" | "blur";
+type PathsOfType<TState extends AnyState, TValue> = {
+    [P in keyof TState]: NonNullable<TState[P]> extends TValue ? P : never;
+}[keyof TState];
 /**
  * Creates props for a form field that syncs with the store at the specified path.
  * @param store The Store object
@@ -12,9 +15,7 @@ export type MethodProp = "change" | "input" | "blur";
  * <input {...formField(store, "username", "value", "onBlur")} />
  * ```
  */
-export declare function formField<TValue extends "value" | "valueAsNumber" | "valueAsDate", T extends NonNullable<HTMLInputElement[TValue]>, P extends PropertyKey, TMethod extends MethodProp = "change">(store: Store<{
-    [_ in P]: T;
-}>, path: P, valueProp: TValue, method?: TMethod): {
+export declare function formField<TValue extends "value" | "valueAsNumber" | "valueAsDate", TStore extends AnyState, TMethod extends MethodProp = "change">(store: Store<TStore>, path: PathsOfType<TStore, HTMLInputElement[TValue]>, valueProp: TValue, method?: TMethod): {
     name: string;
     id: string;
     ref(node: HTMLInputElement | null): (() => void) | undefined;
@@ -35,12 +36,10 @@ export declare function formField<TValue extends "value" | "valueAsNumber" | "va
  * </select>
  * ```
  */
-export declare function formText<T extends string, P extends PropertyKey, TMethod extends MethodProp = "change">(store: Store<{
-    [_ in P]: T;
-}>, path: P, method?: TMethod): {
+export declare function formText<TStore extends AnyState, TMethod extends MethodProp = "change">(store: Store<TStore>, path: PathsOfType<TStore, string>, method?: TMethod): {
     name: string;
     id: string;
-    ref(node: HTMLTextAreaElement | HTMLInputElement | HTMLSelectElement | null): (() => void) | undefined;
+    ref(node: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null): (() => void) | undefined;
 };
 /**
  * Creates props for a checkbox input that syncs with the store at the specified path.
@@ -52,9 +51,7 @@ export declare function formText<T extends string, P extends PropertyKey, TMetho
  * <input type="checkbox" {...formCheckbox(store, "isSubscribed")} />
  * ```
  */
-export declare function formCheckbox<P extends PropertyKey>(store: Store<{
-    [_ in P]: boolean;
-}>, path: P): {
+export declare function formCheckbox<TStore extends AnyState>(store: Store<TStore>, path: PathsOfType<TStore, boolean>): {
     type: string;
     name: string;
     id: string;
@@ -73,9 +70,7 @@ export declare function formCheckbox<P extends PropertyKey>(store: Store<{
  * <input type="checkbox" {...formCheckboxArray(store, "selectedItems", "item2")} /> Item 2
  * ```
  */
-export declare function formCheckboxArray<P extends PropertyKey, K extends StateConstraint>(store: Store<{
-    [_ in P]: K[];
-}>, path: P, option: K): {
+export declare function formCheckboxArray<TStore extends AnyState, P extends PathsOfType<TStore, Primitive[]>>(store: Store<TStore>, path: P, option: TStore[P] extends Primitive[] ? TStore[P][number] : never): {
     type: string;
     name: string;
     id: string;
@@ -93,11 +88,9 @@ export declare function formCheckboxArray<P extends PropertyKey, K extends State
  * <input type="radio" {...formRadio(store, "favoriteColor", "blue")} /> Blue
  * ```
  */
-export declare function formRadio<P extends PropertyKey, K extends string>(store: Store<{
-    [_ in P]: K;
-}>, path: P, option: K): {
+export declare function formRadio<TStore extends AnyState, P extends PathsOfType<TStore, Primitive>>(store: Store<TStore>, path: P, option: TStore[P]): {
     type: string;
-    value: K;
+    value: string;
     name: string;
     id: string;
     ref(node: HTMLInputElement | null): (() => void) | undefined;
@@ -115,9 +108,7 @@ export declare function formRadio<P extends PropertyKey, K extends string>(store
  * </select>
  * ```
  */
-export declare function formSelectMultiple<P extends PropertyKey, K extends string[]>(store: Store<{
-    [_ in P]: K;
-}>, path: P): {
+export declare function formSelectMultiple<TStore extends AnyState>(store: Store<TStore>, path: PathsOfType<TStore, string[]>): {
     multiple: boolean;
     name: string;
     id: string;
@@ -135,8 +126,7 @@ export declare function formSelectMultiple<P extends PropertyKey, K extends stri
  * </dialog>
  * ```
  */
-export declare function dialogModal<P extends PropertyKey>(store: Store<{
-    [_ in P]: boolean;
-}>, path: P): {
+export declare function dialogModal<TStore extends AnyState>(store: Store<TStore>, path: PathsOfType<TStore, boolean>): {
     ref: (node: HTMLDialogElement | null) => (() => void) | undefined;
 };
+export {};

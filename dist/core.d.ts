@@ -1,4 +1,4 @@
-type Primitive = string | number | boolean | null | undefined;
+export type Primitive = string | number | boolean | null | undefined;
 declare const atom: unique symbol;
 /**
  * A unique marker type to identify objects that should be treated as atomic values in patches, even if they are objects or arrays.
