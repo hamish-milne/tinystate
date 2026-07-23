@@ -451,9 +451,7 @@ export function getPrimitiveEntries<T extends AnyState>(store: StoreView<T>): Li
   const impl = getImpl(store);
   const notify = new Map<PropertyKey, StateValue>();
   patchStateValue(undefined, "", impl._state, notify, null);
-  return Array.from(notify.entries()).filter(
-    ([_key, value]) => typeof value !== "object" || value === null || isAtom(value),
-  ) as ListenPair<T>[];
+  return arrayFrom(notify.entries()).filter(([, value]) => isAtomic(value)) as ListenPair<T>[];
 }
 
 type Numberify<T> = T extends `${number}` ? number : T;
@@ -580,9 +578,11 @@ function patchStateValue(
       // If no changes, keep the current value
     } else if (current === next) {
       // No changes
-    } else if (typeof next !== "object" || !next || isAtom(next)) {
+    } else if (isAtomic(next)) {
+      // New value can be replaced directly, no need to merge
       newValue = next;
       if (typeof current === "object" && current && removedObjects) {
+        // If the current value is an object and is being replaced, we need to mark it as removed so that listeners for its sub-paths are notified of deletion.
         removedObjects.add(path);
       }
     } else {
@@ -590,13 +590,18 @@ function patchStateValue(
       if (recursionCheck.has(next)) {
         throw new Error(`Circular reference detected at path "${path as string}"`);
       }
-      recursionCheck.add(next);
       const keys = objectKeys(next).reverse();
       if (isArray(next)) {
         keys.push("length");
       }
-      stack[stack.length - 1][4] = keys;
-      continue;
+      if (keys.length === 0 && isAtomic(current)) {
+        // Replacing a primitive with an empty object, which otherwise returns no changes.
+        newValue = freeze({});
+      } else {
+        recursionCheck.add(next);
+        stack[stack.length - 1][4] = keys;
+        continue;
+      }
     }
     // If we're here, we didn't modify the stack this iteration, so we can pop it
     recursionCheck.delete(next as object);
@@ -670,9 +675,7 @@ function processChangeQueue(impl: StoreImpl) {
       const pairs = freeze(
         arrayFrom(notify.entries()).map(([key, value]) => freeze([key, value ?? null] as const)),
       );
-      const primitivePairs = freeze(
-        pairs.filter(([, value]) => typeof value !== "object" || value === null || isAtom(value)),
-      );
+      const primitivePairs = freeze(pairs.filter(([, value]) => isAtomic(value)));
       for (const [listener, includeObjects] of impl._extListeners) {
         listener(includeObjects ? pairs : primitivePairs);
       }
@@ -783,12 +786,12 @@ export function setAtom<T extends object>(value: T): AtomOf<T> {
 }
 
 /**
- * Checks if a value is an atom, meaning it has been marked with the atom marker and should be treated as a primitive value in patches.
+ * Checks if a value is atomic, meaning it should be treated as a primitive value in patches.
  * @param value The value to check
  * @returns True if the value is an atom, false otherwise
  */
-export function isAtom<T extends object>(value: T): value is AtomOf<T> {
-  return typeof value === "object" && value !== null && (value as AtomOf<T>)[atom] === true;
+export function isAtomic<T>(value: T): value is T extends object ? AtomOf<T> : T {
+  return typeof value !== "object" || value === null || (value as unknown as Atom)[atom] === true;
 }
 
 /* v8 ignore start -- @preserve */
@@ -870,6 +873,15 @@ if (import.meta.vitest) {
     const newArr = setAtom(new Uint8Array([1, 2, 3]));
     patch(store, { a: newArr });
     expect(peek(store, "a")).toBe(newArr);
+  });
+
+  test("can store empty object", () => {
+    const store = createStore({ a: null as { _?: number } | null });
+    const listener = vi.fn();
+    listen(store, "a", listener);
+    patch(store, { a: {} });
+    expect(peek(store, "a")).toEqual({});
+    expect(listener).toHaveBeenCalledWith({}, "a");
   });
 
   test("listen to state changes", () => {
