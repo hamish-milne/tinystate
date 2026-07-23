@@ -276,9 +276,9 @@ export declare function sync<T extends StateConstraint>(store: StoreOf<T>, gette
  */
 export declare function setAtom<T extends object>(value: T): AtomOf<T>;
 /**
- * Checks if a value is an atom, meaning it has been marked with the atom marker and should be treated as a primitive value in patches.
+ * Checks if a value is atomic, meaning it should be treated as a primitive value in patches.
  * @param value The value to check
  * @returns True if the value is an atom, false otherwise
  */
-export declare function isAtom<T extends object>(value: T): value is AtomOf<T>;
+export declare function isAtomic<T>(value: T): value is T extends object ? AtomOf<T> : T;
 export {};
